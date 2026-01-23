@@ -1,3 +1,5 @@
 .env
+schema/schema.md
+schema/schema.json
 airtable_auth_state.json
 airtable_scraper_config.json
