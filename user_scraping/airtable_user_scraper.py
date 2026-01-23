@@ -29,9 +29,11 @@ from playwright.async_api import async_playwright, Page, BrowserContext
 
 
 # Configuration
-AUTH_STATE_FILE = Path("airtable_auth_state.json")
-OUTPUT_FILE = Path("airtable_users_export.json")
-CONFIG_FILE = Path("airtable_scraper_config.json")
+OUTPUT_DIR = Path("output")
+AUTH_STATE_FILE = OUTPUT_DIR / "airtable_auth_state.json"
+OUTPUT_FILE = OUTPUT_DIR / "airtable_users_export.json"
+CONFIG_FILE = OUTPUT_DIR / "airtable_scraper_config.json"
+DEBUG_DIR = OUTPUT_DIR / "debug"
 AIRTABLE_API_KEY_ENV = "AIRTABLE_API_KEY"  # Optional: for fetching base list
 
 
@@ -86,10 +88,10 @@ class BaseAccessReport:
 class AirtableScraper:
     """
     Scrapes user access data from Airtable bases.
-    
-    The scraper works by intercepting the window.resolveLiveappDataPromise()
-    call that Airtable makes when loading a base. This function receives a
-    large JSON payload containing:
+
+    The scraper works by awaiting window.liveappDataPromise, which Airtable
+    creates and resolves with initialization data when loading a base.
+    This promise resolves to a JSON payload containing:
     - rawUsers: all users with access to workspace/base
     - collaboratorsByWorkspaceId: permission mappings at workspace level
     - collaboratorsByApplicationId: permission mappings at base level
@@ -97,8 +99,9 @@ class AirtableScraper:
     - rawApplications: base metadata
     """
     
-    def __init__(self, headless: bool = True):
+    def __init__(self, headless: bool = True, debug: bool = False):
         self.headless = headless
+        self.debug = debug
         self.browser = None
         self.context: Optional[BrowserContext] = None
         self.captured_data: dict = {}
@@ -163,39 +166,28 @@ class AirtableScraper:
         
         page = await self.context.new_page()
         self.captured_data = {}
-        
-        # Inject script to intercept the initialization data
-        await page.add_init_script("""
-            window.__airtableInitData = null;
-            const originalResolve = window.resolveLiveappDataPromise;
-            window.resolveLiveappDataPromise = function(data) {
-                window.__airtableInitData = data;
-                if (originalResolve) {
-                    return originalResolve(data);
-                }
-            };
-        """)
-        
+
         try:
             url = f"https://airtable.com/{base_id}"
             print(f"  Loading {url}...")
-            
+
             await page.goto(url, wait_until="networkidle", timeout=30000)
-            
-            # Wait for data to be captured (with timeout)
-            for _ in range(50):  # 5 seconds max
-                self.captured_data = await page.evaluate(
-                    "() => window.__airtableInitData"
-                )
-                if self.captured_data:
-                    break
-                await asyncio.sleep(0.1)
-            
+
+            # Airtable creates a promise that resolves with all the init data:
+            # window.liveappDataPromise = new Promise(resolve => window.resolveLiveappDataPromise = resolve)
+            # Then later calls resolveLiveappDataPromise({...data...})
+            # We can simply await this promise to get the data.
+            self.captured_data = await page.evaluate("() => window.liveappDataPromise")
+
             if not self.captured_data:
                 # Fallback: try to extract from page source
                 self.captured_data = await self._extract_from_source(page)
-            
+
             if not self.captured_data:
+                # Debug mode: save diagnostic info
+                if self.debug:
+                    await self._save_debug_info(page, base_id)
+
                 return BaseAccessReport(
                     base_id=base_id,
                     base_name="Unknown",
@@ -240,9 +232,99 @@ class AirtableScraper:
                 return json.loads(match.group(1))
             except json.JSONDecodeError:
                 pass
-        
+
         return None
-    
+
+    async def _save_debug_info(self, page: Page, base_id: str) -> None:
+        """
+        Save diagnostic information when data capture fails.
+        Helps identify the current Airtable initialization pattern.
+        """
+        DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+
+        # 1. Save page HTML
+        content = await page.content()
+        html_path = DEBUG_DIR / f"{base_id}.html"
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"  [DEBUG] Saved HTML to {html_path}")
+
+        # 2. Find relevant window globals
+        globals_info = await page.evaluate("""
+            () => {
+                const relevant = Object.keys(window).filter(k => {
+                    const lower = k.toLowerCase();
+                    return lower.includes('resolve') ||
+                           lower.includes('liveapp') ||
+                           lower.includes('init') ||
+                           lower.includes('airtable') ||
+                           lower.includes('data');
+                });
+                return relevant;
+            }
+        """)
+        print(f"  [DEBUG] Relevant window globals: {globals_info}")
+
+        # 3. Search for data patterns in scripts
+        script_info = await page.evaluate("""
+            () => {
+                const patterns = ['rawUsers', 'collaborators', 'rawApplications', 'rawWorkspaces'];
+                const results = {};
+                const scripts = document.querySelectorAll('script');
+                for (const s of scripts) {
+                    const text = s.textContent || '';
+                    for (const p of patterns) {
+                        if (text.includes(p)) {
+                            // Find the context around this pattern
+                            const idx = text.indexOf(p);
+                            const start = Math.max(0, idx - 50);
+                            const end = Math.min(text.length, idx + 100);
+                            results[p] = text.substring(start, end);
+                        }
+                    }
+                }
+                return results;
+            }
+        """)
+        if script_info:
+            print(f"  [DEBUG] Found data patterns in scripts:")
+            for pattern, context in script_info.items():
+                print(f"    - {pattern}: ...{context}...")
+        else:
+            print("  [DEBUG] No data patterns found in inline scripts")
+
+        # 4. Check for any __NEXT_DATA__ or similar embedded JSON
+        embedded_json = await page.evaluate("""
+            () => {
+                // Check for Next.js data
+                const nextData = document.getElementById('__NEXT_DATA__');
+                if (nextData) {
+                    return { type: '__NEXT_DATA__', preview: nextData.textContent.substring(0, 500) };
+                }
+                // Check for other common patterns
+                const scripts = document.querySelectorAll('script[type="application/json"]');
+                for (const s of scripts) {
+                    if (s.textContent && s.textContent.length > 100) {
+                        return { type: 'application/json script', preview: s.textContent.substring(0, 500) };
+                    }
+                }
+                return null;
+            }
+        """)
+        if embedded_json:
+            print(f"  [DEBUG] Found embedded JSON ({embedded_json['type']}):")
+            print(f"    {embedded_json['preview'][:200]}...")
+
+        # 5. Save full debug report
+        report_path = DEBUG_DIR / f"{base_id}_report.txt"
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(f"Debug Report for {base_id}\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(f"Window globals: {globals_info}\n\n")
+            f.write(f"Script patterns: {json.dumps(script_info, indent=2)}\n\n")
+            f.write(f"Embedded JSON: {json.dumps(embedded_json, indent=2)}\n")
+        print(f"  [DEBUG] Full report saved to {report_path}")
+
     def _parse_access_data(self, base_id: str, data: dict) -> BaseAccessReport:
         """
         Parses the captured initialization data to extract user access info.
@@ -827,9 +909,13 @@ async def main():
     parser.add_argument("--csv", type=str, help="Export to single CSV file")
     parser.add_argument("--csv-per-workspace", type=str, metavar="DIR", help="Export separate CSV per workspace to directory")
     parser.add_argument("--no-compare", action="store_true", help="Skip comparison with previous run")
-    
+    parser.add_argument("--debug", action="store_true", help="Save debug info (HTML, globals, network) to diagnose capture issues")
+
     args = parser.parse_args()
-    
+
+    # Ensure output directory exists
+    OUTPUT_DIR.mkdir(exist_ok=True)
+
     # Load config
     config = load_config()
     
@@ -841,7 +927,7 @@ async def main():
             print(json.dumps(config, indent=2))
         return
     
-    async with AirtableScraper(headless=args.headless) as scraper:
+    async with AirtableScraper(headless=args.headless, debug=args.debug) as scraper:
         if args.login:
             # Force non-headless for login
             scraper.headless = False

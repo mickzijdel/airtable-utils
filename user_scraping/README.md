@@ -79,6 +79,7 @@ python airtable_user_scraper.py --csv-per-workspace ./reports/
 --csv-per-workspace   Export separate CSV per workspace
 --no-compare          Skip comparison with previous run
 --no-headless         Show browser (for debugging)
+--debug               Save diagnostic info when capture fails
 ```
 
 ## Output
@@ -124,12 +125,16 @@ WORKSPACE SUMMARY
 
 ## Files Generated
 
+All output files are stored in the `output/` directory:
+
 | File | Purpose |
 |------|---------|
-| `airtable_auth_state.json` | Browser cookies (add to .gitignore) |
-| `airtable_scraper_config.json` | Workspace/base config |
-| `airtable_users_export.json` | Latest results |
-| `airtable_users_export.YYYYMMDD_HHMMSS.json` | Backup of previous run |
+| `output/airtable_auth_state.json` | Browser cookies (add to .gitignore) |
+| `output/airtable_scraper_config.json` | Workspace/base config |
+| `output/airtable_users_export.json` | Latest results |
+| `output/airtable_users_export.YYYYMMDD_HHMMSS.json` | Backup of previous run |
+| `output/debug/{base_id}.html` | Debug HTML (with --debug) |
+| `output/debug/{base_id}_report.txt` | Debug report (with --debug) |
 
 ## Permission Levels
 
