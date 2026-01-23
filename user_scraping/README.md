@@ -80,14 +80,6 @@ python airtable_user_scraper.py --export-csv-from-json
 python airtable_user_scraper.py --export-csv-from-json output/airtable_users_export.20260122_143000.json
 ```
 
-**Legacy per-workspace CSV exports (flat format):**
-```bash
-python airtable_user_scraper.py --csv-per-workspace ./reports/
-# Creates:
-#   ./reports/airtable_users_My_Organisation.csv
-#   ./reports/airtable_users_Research.csv
-```
-
 ## All Options
 
 ```
@@ -98,8 +90,6 @@ python airtable_user_scraper.py --csv-per-workspace ./reports/
 --save-config         Save workspace config from results
 --show-config         Show current config and exit
 --delay N             Seconds between requests (default: 1.0)
---csv FILE            Export all results to single CSV
---csv-per-workspace   Export separate CSV per workspace (flat format)
 --export-csv-from-json [FILE]  Export CSVs from existing JSON (default: latest export)
 --no-compare          Skip comparison with previous run
 --no-headless         Show browser (for debugging)

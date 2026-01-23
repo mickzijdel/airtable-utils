@@ -679,14 +679,27 @@ def export_aggregated_csvs(reports: list[BaseAccessReport]):
                     bases_data[base_id]["permissions"][permission].append(email)
 
         # Calculate total bases per user
+        total_bases_in_workspace = len(bases_data)
         for user_id, data in users_data.items():
             total = sum(len(data["permissions"][level]) for level in permission_levels)
             data["total_bases"] = total
 
-        # Calculate total users per base
+        # Find workspace-wide users (those with access to ALL bases)
+        workspace_wide_emails = {
+            data["email"] for _, data in users_data.items()
+            if data["total_bases"] == total_bases_in_workspace
+        }
+
+        # Calculate total users per base and base-specific users
         for base_id, data in bases_data.items():
-            total = sum(len(data["permissions"][level]) for level in permission_levels)
-            data["total_users"] = total
+            all_emails = set()
+            for level in permission_levels:
+                all_emails.update(data["permissions"][level])
+            data["total_users"] = len(all_emails)
+            # Base-specific = users who are NOT workspace-wide
+            base_specific_emails = all_emails - workspace_wide_emails
+            data["base_specific_users_count"] = len(base_specific_emails)
+            data["base_specific_users_list"] = sorted(base_specific_emails)
 
         # Write users CSV for this workspace (sorted by total_bases descending)
         users_csv_path = OUTPUT_DIR / f"{safe_name}_users.csv"
@@ -715,7 +728,7 @@ def export_aggregated_csvs(reports: list[BaseAccessReport]):
         with open(bases_csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow([
-                "base_id", "base_name", "total_users",
+                "base_id", "base_name", "total_users", "base_specific_count", "base_specific_users",
                 "owner_users", "create_users", "edit_users", "comment_users", "read_users"
             ])
 
@@ -724,6 +737,8 @@ def export_aggregated_csvs(reports: list[BaseAccessReport]):
                     base_id,
                     data["base_name"],
                     data["total_users"],
+                    data["base_specific_users_count"],
+                    ", ".join(data["base_specific_users_list"]),
                     ", ".join(sorted(data["permissions"]["owner"])),
                     ", ".join(sorted(data["permissions"]["create"])),
                     ", ".join(sorted(data["permissions"]["edit"])),
