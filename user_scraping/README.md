@@ -59,7 +59,28 @@ python airtable_user_scraper.py --workspace wspXXXXXXXXXXXXXX
 python airtable_user_scraper.py --workspace "Operations" "Research"
 ```
 
-**Per-workspace CSV exports:**
+**Per-workspace aggregated CSVs (automatically generated):**
+
+Every scrape automatically creates per-workspace CSV files in `output/`:
+- `{Workspace}_users.csv` - One row per user, showing which bases they have each permission level for
+- `{Workspace}_bases.csv` - One row per base, showing which users have each permission level
+
+Example:
+```
+output/My_Organisation_users.csv
+output/My_Organisation_bases.csv
+output/Unknown_users.csv
+output/Unknown_bases.csv
+```
+
+**Export CSVs from existing JSON (no re-scrape needed):**
+```bash
+python airtable_user_scraper.py --export-csv-from-json
+# Or specify a different JSON file:
+python airtable_user_scraper.py --export-csv-from-json output/airtable_users_export.20260122_143000.json
+```
+
+**Legacy per-workspace CSV exports (flat format):**
 ```bash
 python airtable_user_scraper.py --csv-per-workspace ./reports/
 # Creates:
@@ -78,7 +99,8 @@ python airtable_user_scraper.py --csv-per-workspace ./reports/
 --show-config         Show current config and exit
 --delay N             Seconds between requests (default: 1.0)
 --csv FILE            Export all results to single CSV
---csv-per-workspace   Export separate CSV per workspace
+--csv-per-workspace   Export separate CSV per workspace (flat format)
+--export-csv-from-json [FILE]  Export CSVs from existing JSON (default: latest export)
 --no-compare          Skip comparison with previous run
 --no-headless         Show browser (for debugging)
 --debug               Save diagnostic info when capture fails
@@ -135,6 +157,8 @@ All output files are stored in the `output/` directory:
 | `output/airtable_scraper_config.json` | Workspace/base config |
 | `output/airtable_users_export.json` | Latest results |
 | `output/airtable_users_export.YYYYMMDD_HHMMSS.json` | Backup of previous run |
+| `output/{Workspace}_users.csv` | Per-workspace user permissions (aggregated) |
+| `output/{Workspace}_bases.csv` | Per-workspace base permissions (aggregated) |
 | `output/debug/{base_id}.html` | Debug HTML (with --debug) |
 | `output/debug/{base_id}_report.txt` | Debug report (with --debug) |
 

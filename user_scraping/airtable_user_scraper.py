@@ -60,6 +60,16 @@ class UserInfo:
             "permission_level": self.permission_level,
         }
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "UserInfo":
+        return cls(
+            id=data["id"],
+            email=data["email"],
+            first_name=data.get("first_name", ""),
+            last_name=data.get("last_name", ""),
+            permission_level=data.get("permission_level", "unknown"),
+        )
+
 
 @dataclass
 class BaseAccessReport:
@@ -83,6 +93,26 @@ class BaseAccessReport:
             "scrape_time": self.scrape_time,
             "error": self.error,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "BaseAccessReport":
+        users = [UserInfo.from_dict(u) for u in data.get("users", [])]
+        return cls(
+            base_id=data["base_id"],
+            base_name=data["base_name"],
+            workspace_id=data.get("workspace_id", "Unknown"),
+            workspace_name=data.get("workspace_name", "Unknown"),
+            users=users,
+            scrape_time=data.get("scrape_time", ""),
+            error=data.get("error"),
+        )
+
+
+def load_reports_from_json(json_path: Path) -> list[BaseAccessReport]:
+    """Load BaseAccessReport objects from a JSON export file."""
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return [BaseAccessReport.from_dict(b) for b in data.get("bases", [])]
 
 
 class AirtableScraper:
@@ -681,6 +711,130 @@ def export_per_workspace(reports: list[BaseAccessReport], output_dir: str = ".")
     return files_created
 
 
+def export_aggregated_csvs(reports: list[BaseAccessReport]):
+    """
+    Export aggregated CSV files per workspace:
+    - {workspace}_users.csv - One row per user, columns for each permission level with base names
+    - {workspace}_bases.csv - One row per base, columns for each permission level with user emails
+    """
+    import csv
+
+    permission_levels = ["owner", "create", "edit", "comment", "read"]
+
+    # Group reports by workspace
+    by_workspace: dict[str, list[BaseAccessReport]] = {}
+    for report in reports:
+        if report.error:
+            continue
+        ws_key = report.workspace_id or "Unknown"
+        if ws_key not in by_workspace:
+            by_workspace[ws_key] = []
+        by_workspace[ws_key].append(report)
+
+    files_created = []
+
+    for ws_id, ws_reports in by_workspace.items():
+        ws_name = ws_reports[0].workspace_name or "Unknown"
+
+        # Sanitize filename
+        safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in ws_name)
+        safe_name = safe_name.replace(" ", "_")
+
+        # Build user-centric data for this workspace
+        users_data: dict[str, dict] = {}
+        # Build base-centric data for this workspace
+        bases_data: dict[str, dict] = {}
+
+        for report in ws_reports:
+            base_id = report.base_id
+            base_name = report.base_name
+
+            # Initialize base entry
+            if base_id not in bases_data:
+                bases_data[base_id] = {
+                    "base_name": base_name,
+                    "permissions": {level: [] for level in permission_levels}
+                }
+
+            for user in report.users:
+                user_id = user.id
+                email = user.email
+                name = user.full_name
+                permission = user.permission_level
+
+                # Initialize user entry
+                if user_id not in users_data:
+                    users_data[user_id] = {
+                        "name": name,
+                        "email": email,
+                        "permissions": {level: [] for level in permission_levels}
+                    }
+
+                # Add base to user's permission list
+                if permission in permission_levels:
+                    users_data[user_id]["permissions"][permission].append(base_name)
+                    bases_data[base_id]["permissions"][permission].append(email)
+
+        # Calculate total bases per user
+        for user_id, data in users_data.items():
+            total = sum(len(data["permissions"][level]) for level in permission_levels)
+            data["total_bases"] = total
+
+        # Calculate total users per base
+        for base_id, data in bases_data.items():
+            total = sum(len(data["permissions"][level]) for level in permission_levels)
+            data["total_users"] = total
+
+        # Write users CSV for this workspace (sorted by total_bases descending)
+        users_csv_path = OUTPUT_DIR / f"{safe_name}_users.csv"
+        with open(users_csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "user_id", "name", "email", "total_bases",
+                "owner_bases", "create_bases", "edit_bases", "comment_bases", "read_bases"
+            ])
+
+            for user_id, data in sorted(users_data.items(), key=lambda x: -x[1]["total_bases"]):
+                writer.writerow([
+                    user_id,
+                    data["name"],
+                    data["email"],
+                    data["total_bases"],
+                    ", ".join(sorted(data["permissions"]["owner"])),
+                    ", ".join(sorted(data["permissions"]["create"])),
+                    ", ".join(sorted(data["permissions"]["edit"])),
+                    ", ".join(sorted(data["permissions"]["comment"])),
+                    ", ".join(sorted(data["permissions"]["read"])),
+                ])
+
+        # Write bases CSV for this workspace (sorted by total_users descending)
+        bases_csv_path = OUTPUT_DIR / f"{safe_name}_bases.csv"
+        with open(bases_csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "base_id", "base_name", "total_users",
+                "owner_users", "create_users", "edit_users", "comment_users", "read_users"
+            ])
+
+            for base_id, data in sorted(bases_data.items(), key=lambda x: -x[1]["total_users"]):
+                writer.writerow([
+                    base_id,
+                    data["base_name"],
+                    data["total_users"],
+                    ", ".join(sorted(data["permissions"]["owner"])),
+                    ", ".join(sorted(data["permissions"]["create"])),
+                    ", ".join(sorted(data["permissions"]["edit"])),
+                    ", ".join(sorted(data["permissions"]["comment"])),
+                    ", ".join(sorted(data["permissions"]["read"])),
+                ])
+
+        files_created.append((ws_name, len(users_data), len(bases_data)))
+        print(f"Exported {users_csv_path} ({len(users_data)} users)")
+        print(f"Exported {bases_csv_path} ({len(bases_data)} bases)")
+
+    return files_created
+
+
 def generate_workspace_summary(reports: list[BaseAccessReport]) -> dict:
     """
     Generate a summary report grouped by workspace.
@@ -1014,6 +1168,8 @@ async def main():
     parser.add_argument("--max-retries", type=int, default=3, help="Maximum retries for transient errors (default: 3)")
     parser.add_argument("--context-recycle", type=int, default=15, help="Recycle browser context every N requests (default: 15)")
     parser.add_argument("--max-delay", type=float, default=10.0, help="Maximum adaptive delay after errors in seconds (default: 10)")
+    parser.add_argument("--export-csv-from-json", type=str, nargs="?", const="default", metavar="JSON_FILE",
+                        help="Export CSV files from existing JSON (default: output/airtable_users_export.json)")
 
     args = parser.parse_args()
 
@@ -1030,7 +1186,19 @@ async def main():
             print("\nDetailed config:")
             print(json.dumps(config, indent=2))
         return
-    
+
+    # Export CSVs from existing JSON and exit
+    if args.export_csv_from_json:
+        json_path = OUTPUT_FILE if args.export_csv_from_json == "default" else Path(args.export_csv_from_json)
+        if not json_path.exists():
+            print(f"Error: JSON file not found: {json_path}")
+            return
+        print(f"Loading reports from {json_path}...")
+        reports = load_reports_from_json(json_path)
+        print(f"Loaded {len(reports)} base reports")
+        export_aggregated_csvs(reports)
+        return
+
     async with AirtableScraper(
         headless=args.headless,
         debug=args.debug,
@@ -1121,8 +1289,11 @@ async def main():
             json.dump(output, f, indent=2)
         
         print(f"\nResults saved to {OUTPUT_FILE}")
-        
-        # CSV exports
+
+        # Aggregated CSV exports (always generated)
+        export_aggregated_csvs(reports)
+
+        # Optional CSV exports
         if args.csv:
             export_to_csv(reports, args.csv)
         
