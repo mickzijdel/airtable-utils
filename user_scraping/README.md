@@ -2,6 +2,8 @@
 
 Scrapes user access data from Airtable bases, grouped by workspace.
 
+NOTE THAT THIS GOES AGAINST THEIR [ACCEPTABLE USE POLICY](https://www.airtable.com/company/aup)! USE AT YOUR OWN RISK
+
 ## Problem
 Airtable's API doesn't expose user/collaborator data on the Team plan. But the web UI contains this data in the page's initialization JavaScript (`window.resolveLiveappDataPromise({...})`).
 

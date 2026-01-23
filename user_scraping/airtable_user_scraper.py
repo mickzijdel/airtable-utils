@@ -99,12 +99,21 @@ class AirtableScraper:
     - rawApplications: base metadata
     """
     
-    def __init__(self, headless: bool = True, debug: bool = False):
+    def __init__(
+        self,
+        headless: bool = True,
+        debug: bool = False,
+        context_recycle_interval: int = 15,
+        max_retries: int = 3,
+    ):
         self.headless = headless
         self.debug = debug
         self.browser = None
         self.context: Optional[BrowserContext] = None
         self.captured_data: dict = {}
+        self.context_recycle_interval = context_recycle_interval
+        self.max_retries = max_retries
+        self._requests_since_recycle = 0
     
     async def __aenter__(self):
         self.playwright = await async_playwright().start()
@@ -150,64 +159,135 @@ class AirtableScraper:
             storage_state=str(AUTH_STATE_FILE)
         )
         return self.context
-    
+
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """Determine if an error is transient and worth retrying."""
+        error_str = str(error).lower()
+        retryable_patterns = [
+            "timeout",
+            "net::err_connection",
+            "net::err_network",
+            "net::err_aborted",
+            "navigation failed",
+            "page crashed",
+            "context closed",
+            "target closed",
+            "session closed",
+            "rate limit",
+            "429",
+            "503",
+            "502",
+        ]
+        return any(pattern in error_str for pattern in retryable_patterns)
+
+    async def _maybe_recycle_context(self) -> None:
+        """Recycle browser context periodically to prevent resource exhaustion."""
+        self._requests_since_recycle += 1
+
+        if self._requests_since_recycle >= self.context_recycle_interval:
+            if self.context:
+                print("  [Recycling browser context...]")
+                await self.context.close()
+                self.context = None
+            self._requests_since_recycle = 0
+            await self.load_auth()
+
     async def scrape_base(self, base_id: str) -> BaseAccessReport:
         """
-        Scrapes user access data from a single base.
-        
+        Scrapes user access data from a single base with retry logic.
+
         Args:
             base_id: Airtable base ID (e.g., 'appXXXXXXXXXXXXXX')
-        
+
         Returns:
             BaseAccessReport with all users who have access
         """
         if not self.context:
             await self.load_auth()
-        
-        page = await self.context.new_page()
-        self.captured_data = {}
 
-        try:
-            url = f"https://airtable.com/{base_id}"
-            print(f"  Loading {url}...")
+        await self._maybe_recycle_context()
 
-            await page.goto(url, wait_until="networkidle", timeout=30000)
+        last_error = None
+        initial_backoff = 2.0
+        backoff_multiplier = 2.0
+        max_backoff = 30.0
+        backoff = initial_backoff
 
-            # Airtable creates a promise that resolves with all the init data:
-            # window.liveappDataPromise = new Promise(resolve => window.resolveLiveappDataPromise = resolve)
-            # Then later calls resolveLiveappDataPromise({...data...})
-            # We can simply await this promise to get the data.
-            self.captured_data = await page.evaluate("() => window.liveappDataPromise")
+        for attempt in range(self.max_retries + 1):
+            if attempt > 0:
+                print(f"  Retry {attempt}/{self.max_retries} after {backoff:.1f}s backoff...")
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * backoff_multiplier, max_backoff)
 
-            if not self.captured_data:
-                # Fallback: try to extract from page source
-                self.captured_data = await self._extract_from_source(page)
+            page = await self.context.new_page()
+            self.captured_data = {}
 
-            if not self.captured_data:
-                # Debug mode: save diagnostic info
-                if self.debug:
-                    await self._save_debug_info(page, base_id)
+            try:
+                url = f"https://airtable.com/{base_id}"
+                if attempt == 0:
+                    print(f"  Loading {url}...")
 
-                return BaseAccessReport(
-                    base_id=base_id,
-                    base_name="Unknown",
-                    workspace_id="Unknown",
-                    workspace_name="Unknown",
-                    error="Failed to capture initialization data"
-                )
-            
-            return self._parse_access_data(base_id, self.captured_data)
-            
-        except Exception as e:
-            return BaseAccessReport(
-                base_id=base_id,
-                base_name="Unknown",
-                workspace_id="Unknown",
-                workspace_name="Unknown",
-                error=str(e)
-            )
-        finally:
-            await page.close()
+                # Use domcontentloaded instead of networkidle - more reliable for JS-heavy apps
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+
+                # Wait for the liveappDataPromise with explicit timeout
+                # This is more reliable than networkidle for complex JS apps
+                self.captured_data = await page.evaluate("""
+                    () => {
+                        return Promise.race([
+                            window.liveappDataPromise,
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('liveappDataPromise timeout')), 25000)
+                            )
+                        ]);
+                    }
+                """)
+
+                if not self.captured_data:
+                    # Fallback: try to extract from page source
+                    self.captured_data = await self._extract_from_source(page)
+
+                if not self.captured_data:
+                    # Debug mode: save diagnostic info
+                    if self.debug:
+                        await self._save_debug_info(page, base_id)
+
+                    return BaseAccessReport(
+                        base_id=base_id,
+                        base_name="Unknown",
+                        workspace_id="Unknown",
+                        workspace_name="Unknown",
+                        error="Failed to capture initialization data"
+                    )
+
+                return self._parse_access_data(base_id, self.captured_data)
+
+            except Exception as e:
+                last_error = str(e)
+                is_retryable = self._is_retryable_error(e)
+
+                if not is_retryable or attempt >= self.max_retries:
+                    return BaseAccessReport(
+                        base_id=base_id,
+                        base_name="Unknown",
+                        workspace_id="Unknown",
+                        workspace_name="Unknown",
+                        error=f"{'(after retries) ' if attempt > 0 else ''}{last_error}"
+                    )
+
+                print(f"  Transient error: {last_error}")
+
+            finally:
+                await page.close()
+
+        # Should not reach here, but just in case
+        return BaseAccessReport(
+            base_id=base_id,
+            base_name="Unknown",
+            workspace_id="Unknown",
+            workspace_name="Unknown",
+            error=last_error or "Unknown error"
+        )
     
     async def _extract_from_source(self, page: Page) -> Optional[dict]:
         """
@@ -413,36 +493,59 @@ class AirtableScraper:
         )
     
     async def scrape_multiple_bases(
-        self, 
+        self,
         base_ids: list[str],
-        delay_seconds: float = 1.0
+        delay_seconds: float = 1.0,
+        error_delay_multiplier: float = 2.0,
+        max_delay_seconds: float = 10.0,
     ) -> list[BaseAccessReport]:
         """
-        Scrapes multiple bases with a delay between requests.
-        
+        Scrapes multiple bases with adaptive delays between requests.
+
         Args:
             base_ids: List of Airtable base IDs
-            delay_seconds: Delay between scraping each base (be nice to Airtable)
-        
+            delay_seconds: Base delay between scraping each base
+            error_delay_multiplier: Multiply delay by this factor after errors
+            max_delay_seconds: Maximum delay between requests
+
         Returns:
             List of BaseAccessReport objects
         """
         reports = []
         total = len(base_ids)
-        
+        current_delay = delay_seconds
+        consecutive_errors = 0
+
         for i, base_id in enumerate(base_ids, 1):
             print(f"[{i}/{total}] Scraping base {base_id}...")
             report = await self.scrape_base(base_id)
             reports.append(report)
-            
+
             if report.error:
                 print(f"  Error: {report.error}")
+                consecutive_errors += 1
+                # Increase delay after errors
+                current_delay = min(
+                    current_delay * error_delay_multiplier,
+                    max_delay_seconds
+                )
+                print(f"  Increasing delay to {current_delay:.1f}s")
             else:
                 print(f"  Found {len(report.users)} users in '{report.base_name}'")
-            
+                consecutive_errors = 0
+                # Gradually return to base delay after successes
+                if current_delay > delay_seconds:
+                    current_delay = max(delay_seconds, current_delay / error_delay_multiplier)
+
+            # Warn after many consecutive errors
+            if consecutive_errors >= 5:
+                print(f"\n  WARNING: {consecutive_errors} consecutive errors!")
+                print("  This might indicate rate limiting or session expiry.")
+                print("  Consider: Re-running with --login or waiting before continuing.\n")
+
             if i < total:
-                await asyncio.sleep(delay_seconds)
-        
+                await asyncio.sleep(current_delay)
+
         return reports
 
 
@@ -910,6 +1013,9 @@ async def main():
     parser.add_argument("--csv-per-workspace", type=str, metavar="DIR", help="Export separate CSV per workspace to directory")
     parser.add_argument("--no-compare", action="store_true", help="Skip comparison with previous run")
     parser.add_argument("--debug", action="store_true", help="Save debug info (HTML, globals, network) to diagnose capture issues")
+    parser.add_argument("--max-retries", type=int, default=3, help="Maximum retries for transient errors (default: 3)")
+    parser.add_argument("--context-recycle", type=int, default=15, help="Recycle browser context every N requests (default: 15)")
+    parser.add_argument("--max-delay", type=float, default=10.0, help="Maximum adaptive delay after errors in seconds (default: 10)")
 
     args = parser.parse_args()
 
@@ -927,7 +1033,12 @@ async def main():
             print(json.dumps(config, indent=2))
         return
     
-    async with AirtableScraper(headless=args.headless, debug=args.debug) as scraper:
+    async with AirtableScraper(
+        headless=args.headless,
+        debug=args.debug,
+        context_recycle_interval=args.context_recycle,
+        max_retries=args.max_retries,
+    ) as scraper:
         if args.login:
             # Force non-headless for login
             scraper.headless = False
@@ -978,7 +1089,11 @@ async def main():
             print(f"Previous output backed up to {backup_path}")
         
         # Scrape
-        reports = await scraper.scrape_multiple_bases(base_ids, delay_seconds=args.delay)
+        reports = await scraper.scrape_multiple_bases(
+            base_ids,
+            delay_seconds=args.delay,
+            max_delay_seconds=args.max_delay,
+        )
         
         # Update config with workspace info from results
         if args.save_config:
