@@ -832,11 +832,9 @@ def update_config_from_reports(config: dict, reports: list[BaseAccessReport]) ->
     for report in reports:
         if report.error:
             continue
-        
-        ws_id = report.workspace_id
-        if ws_id == "Unknown" or not ws_id:
-            continue
-        
+
+        ws_id = report.workspace_id or "Unknown"
+
         if ws_id not in workspaces:
             workspaces[ws_id] = {
                 "name": report.workspace_name,
