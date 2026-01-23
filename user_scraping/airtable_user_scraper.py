@@ -614,103 +614,6 @@ async def fetch_base_ids_from_api() -> list[str]:
         return [b["id"] for b in bases]
 
 
-def export_to_csv(reports: list[BaseAccessReport], filename: str = "airtable_users.csv"):
-    """Exports reports to a CSV file for easy viewing."""
-    import csv
-    
-    with open(filename, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            "Base ID", "Base Name", "Workspace ID", "Workspace", "User ID", 
-            "Email", "Name", "Permission Level"
-        ])
-        
-        for report in reports:
-            if report.error:
-                writer.writerow([
-                    report.base_id, f"ERROR: {report.error}", "", "", "", "", "", ""
-                ])
-            else:
-                for user in report.users:
-                    writer.writerow([
-                        report.base_id,
-                        report.base_name,
-                        report.workspace_id,
-                        report.workspace_name,
-                        user.id,
-                        user.email,
-                        user.full_name,
-                        user.permission_level,
-                    ])
-    
-    print(f"Exported to {filename}")
-
-
-def export_per_workspace(reports: list[BaseAccessReport], output_dir: str = "."):
-    """
-    Export separate CSV files per workspace.
-    
-    Creates files like:
-      - airtable_users_My_Organisation.csv
-      - airtable_users_Research.csv
-    """
-    import csv
-    from pathlib import Path
-    
-    output_path = Path(output_dir)
-    output_path.mkdir(exist_ok=True)
-    
-    # Group reports by workspace
-    by_workspace: dict[str, list[BaseAccessReport]] = {}
-    for report in reports:
-        ws_key = report.workspace_id or "unknown"
-        if ws_key not in by_workspace:
-            by_workspace[ws_key] = []
-        by_workspace[ws_key].append(report)
-    
-    files_created = []
-    
-    for ws_id, ws_reports in by_workspace.items():
-        # Get workspace name from first report
-        ws_name = ws_reports[0].workspace_name or "Unknown"
-        
-        # Sanitize filename
-        safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in ws_name)
-        safe_name = safe_name.replace(" ", "_")
-        
-        filename = output_path / f"airtable_users_{safe_name}.csv"
-        
-        with open(filename, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                "Base ID", "Base Name", "User ID", "Email", "Name", "Permission Level"
-            ])
-            
-            for report in ws_reports:
-                if report.error:
-                    writer.writerow([
-                        report.base_id, f"ERROR: {report.error}", "", "", "", ""
-                    ])
-                else:
-                    for user in report.users:
-                        writer.writerow([
-                            report.base_id,
-                            report.base_name,
-                            user.id,
-                            user.email,
-                            user.full_name,
-                            user.permission_level,
-                        ])
-        
-        files_created.append((filename, ws_name, len(ws_reports)))
-    
-    print(f"\nExported {len(files_created)} workspace files:")
-    for filepath, ws_name, base_count in files_created:
-        print(f"  {filepath} ({ws_name}, {base_count} bases)")
-    
-    return files_created
-
-
 def export_aggregated_csvs(reports: list[BaseAccessReport]):
     """
     Export aggregated CSV files per workspace:
@@ -1161,8 +1064,6 @@ async def main():
     parser.add_argument("--headless", action="store_true", default=True, help="Run headless")
     parser.add_argument("--no-headless", dest="headless", action="store_false")
     parser.add_argument("--delay", type=float, default=1.0, help="Delay between bases (seconds)")
-    parser.add_argument("--csv", type=str, help="Export to single CSV file")
-    parser.add_argument("--csv-per-workspace", type=str, metavar="DIR", help="Export separate CSV per workspace to directory")
     parser.add_argument("--no-compare", action="store_true", help="Skip comparison with previous run")
     parser.add_argument("--debug", action="store_true", help="Save debug info (HTML, globals, network) to diagnose capture issues")
     parser.add_argument("--max-retries", type=int, default=3, help="Maximum retries for transient errors (default: 3)")
@@ -1293,13 +1194,6 @@ async def main():
         # Aggregated CSV exports (always generated)
         export_aggregated_csvs(reports)
 
-        # Optional CSV exports
-        if args.csv:
-            export_to_csv(reports, args.csv)
-        
-        if args.csv_per_workspace:
-            export_per_workspace(reports, args.csv_per_workspace)
-        
         # Summary
         print(f"\nSummary:")
         print(f"  Scraped: {len(reports)} bases")
