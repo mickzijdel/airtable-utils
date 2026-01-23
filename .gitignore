@@ -2,3 +2,4 @@
 schema/schema.md
 schema/schema.json
 user_scraping/output
+__pycache__
