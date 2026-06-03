@@ -1,10 +1,16 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "airtable-utils",
-  "description": "Skills for working with Airtable: scripting API guidance, schema export, and user access scraping.",
   "version": "1.0.0",
+  "description": "Skills and utilities for working with Airtable: scripting API guidance, schema export, and collaborator access scraping.",
   "author": {
-    "name": "Mick Zijdel"
+    "name": "Mick Zijdel",
+    "email": "claude@mickzijdel.com",
+    "url": "https://github.com/mickzijdel"
   },
+  "homepage": "https://github.com/mickzijdel/airtable_utils",
+  "repository": "https://github.com/mickzijdel/airtable_utils",
   "license": "MIT",
-  "keywords": ["airtable", "scripting", "schema", "users", "mcp"]
+  "keywords": ["airtable", "scripting", "schema", "users"],
+  "skills": "skills/"
 }

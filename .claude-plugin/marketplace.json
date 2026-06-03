@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "airtable-utils",
+  "version": "1.0.0",
+  "description": "Claude Code skills and utilities for working with Airtable.",
+  "owner": {
+    "name": "Mick Zijdel",
+    "email": "claude@mickzijdel.com",
+    "url": "https://github.com/mickzijdel"
+  },
+  "plugins": [
+    {
+      "name": "airtable-utils",
+      "displayName": "Airtable Utils",
+      "description": "Skills and utilities for working with Airtable: schema export, scripting guidance, and collaborator access scraping.",
+      "source": ".",
+      "category": "productivity",
+      "version": "1.0.0",
+      "author": {
+        "name": "Mick Zijdel",
+        "email": "claude@mickzijdel.com",
+        "url": "https://github.com/mickzijdel"
+      },
+      "homepage": "https://github.com/mickzijdel/airtable_utils",
+      "keywords": ["airtable", "schema", "scripting", "automation"]
+    }
+  ]
+}
