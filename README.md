@@ -46,7 +46,7 @@ python user_scraping/airtable_user_scraper.py               # scrape
 The repo serves as its own marketplace. Add it once, then install the plugin:
 
 ```
-/plugin marketplace add github:mickzijdel/airtable_utils
+/plugin marketplace add mickzijdel/airtable_utils
 /plugin install airtable-utils@airtable-utils
 ```
 
