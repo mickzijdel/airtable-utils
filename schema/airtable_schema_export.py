@@ -16,7 +16,21 @@ Requirements:
 import argparse
 import json
 import requests
+from datetime import datetime
 from typing import Any
+
+
+def get_base_info(token: str, base_id: str) -> str:
+    """Fetch the base name for a given base ID."""
+    url = "https://api.airtable.com/v0/meta/bases"
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    bases = response.json().get("bases", [])
+    for base in bases:
+        if base.get("id") == base_id:
+            return base.get("name", base_id)
+    return base_id
 
 
 def get_base_schema(token: str, base_id: str) -> dict[str, Any]:
@@ -42,18 +56,24 @@ def get_base_schema(token: str, base_id: str) -> dict[str, Any]:
     return response.json()
 
 
-def format_schema_as_markdown(schema: dict[str, Any], base_id: str) -> str:
+def format_schema_as_markdown(schema: dict[str, Any], base_id: str, base_name: str) -> str:
     """
     Convert the schema to a readable markdown format.
-    
+
     Args:
         schema: The raw schema from Airtable API
         base_id: The base ID for reference
-    
+        base_name: The human-readable base name
+
     Returns:
         Markdown-formatted string
     """
-    lines = [f"# Airtable Base Schema: `{base_id}`\n"]
+    now = datetime.now()
+    timestamp = now.strftime("%Y-%m-%d %H:%M")
+    lines = [f"# Airtable Base Schema: {base_name} (`{base_id}`) — {timestamp}\n"]
+    lines.append(f"**Base:** {base_name}  ")
+    lines.append(f"**App ID:** `{base_id}`  ")
+    lines.append(f"**Exported:** {timestamp}\n")
     
     for table in schema.get("tables", []):
         table_name = table.get("name", "Unnamed Table")
@@ -133,6 +153,8 @@ def main():
     args = parser.parse_args()
     
     print(f"Fetching schema for base: {args.base}")
+    base_name = get_base_info(args.token, args.base)
+    print(f"Base name: {base_name}")
     schema = get_base_schema(args.token, args.base)
     
     # Count tables and fields
@@ -152,7 +174,7 @@ def main():
     
     if args.format in ("markdown", "both"):
         md_file = f"{base_name}.md"
-        markdown = format_schema_as_markdown(schema, args.base)
+        markdown = format_schema_as_markdown(schema, args.base, base_name)
         with open(md_file, "w") as f:
             f.write(markdown)
         print(f"Markdown schema saved to: {md_file}")
