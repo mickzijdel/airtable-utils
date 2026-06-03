@@ -11,6 +11,5 @@
   "homepage": "https://github.com/mickzijdel/airtable-utils",
   "repository": "https://github.com/mickzijdel/airtable-utils",
   "license": "MIT",
-  "keywords": ["airtable", "scripting", "schema", "users"],
-  "skills": "skills/"
+  "keywords": ["airtable", "scripting", "schema", "users"]
 }
