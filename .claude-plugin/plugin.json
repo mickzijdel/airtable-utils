@@ -1,0 +1,10 @@
+{
+  "name": "airtable-utils",
+  "description": "Skills for working with Airtable: scripting API guidance, schema export, and user access scraping.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Mick Zijdel"
+  },
+  "license": "MIT",
+  "keywords": ["airtable", "scripting", "schema", "users", "mcp"]
+}
