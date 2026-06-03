@@ -36,8 +36,8 @@ The config groups bases by workspace:
 {
   "workspaces": {
     "wspXXXXXXXXXXXXXX": {
-      "name": "My Organisation",
-      "base_ids": ["appXXXXXXXXXXXXXX", "appXXXXXXXXXX"]
+      "name": " Operations",
+      "base_ids": ["appXXXXXXXXXX", "appYYYYYYYYYY"]
     },
     "wspYYYYYYYYYYYYY": {
       "name": "Research",
@@ -50,7 +50,7 @@ The config groups bases by workspace:
 **Filter by workspace:**
 ```bash
 # By name (case-insensitive)
-python airtable_user_scraper.py --workspace "My Organisation"
+python airtable_user_scraper.py --workspace "Operations"
 
 # By ID
 python airtable_user_scraper.py --workspace wspXXXXXXXXXXXXXX
@@ -67,8 +67,8 @@ Every scrape automatically creates per-workspace CSV files in `output/`:
 
 Example:
 ```
-output/My_Organisation_users.csv
-output/My_Organisation_bases.csv
+output/Operations_users.csv
+output/Operations_bases.csv
 output/Unknown_users.csv
 output/Unknown_bases.csv
 ```
@@ -109,7 +109,7 @@ Example:
 WORKSPACE SUMMARY
 ============================================================
 
-📁 My Organisation (wspXXXXXXXXXXXXXX)
+📁 Operations (wspYYYYYYYYYYYYY)
    Bases: 12
    Unique users: 9
    Permissions: create: 7, owner: 2
@@ -127,7 +127,7 @@ WORKSPACE SUMMARY
   "total_bases": 17,
   "workspace_summary": {
     "wspXXXXXXXXXXXXXX": {
-      "workspace_name": "My Organisation",
+      "workspace_name": "Operations",
       "base_count": 12,
       "unique_user_count": 9,
       "users": [...]
