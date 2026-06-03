@@ -32,9 +32,9 @@ Runs `airtable-scrape-users` to scrape collaborator access data from Airtable ba
 
 ## Utilities
 
-Scripts live in `bin/` and work both as standalone CLI tools and as plugin-managed commands. They use [PEP 723 inline script metadata](https://peps.python.org/pep-0723/) so `uv` handles dependencies automatically — no virtualenv setup needed.
+Scripts live in `bin/` and use [PEP 723 inline script metadata](https://peps.python.org/pep-0723/) so `uv` handles dependencies automatically — no virtualenv setup needed.
 
-> **Standalone use:** Clone the repo, make sure [`uv`](https://docs.astral.sh/uv/) is on your PATH, and run `bin/airtable-export-schema` directly (or add `bin/` to your PATH).
+When installed as a plugin, Claude can call these scripts directly. For terminal access by you, see the note in the [Installation](#installation) section below.
 
 ### `airtable-export-schema`
 
@@ -104,6 +104,12 @@ The repo serves as its own marketplace. Add it once, then install the plugin:
 /plugin marketplace add mickzijdel/airtable-utils
 /plugin install airtable-utils@airtable-utils
 ```
+
+> **Note:** The `bin/` scripts are added to Claude's PATH within sessions, but not to your terminal's PATH. To call them from your own shell, run this once after installing (and again after updating):
+> ```bash
+> ln -sf ~/.claude/plugins/cache/airtable-utils/airtable-utils/*/bin/airtable-* ~/.local/bin/
+> ```
+> This symlinks the scripts into `~/.local/bin/`, which is on PATH by default on most Linux and macOS systems.
 
 > **SSH error?** If installation fails with `git@github.com: Permission denied (publickey)`, Claude Code is trying to clone via SSH. Either [add an SSH key to your GitHub account](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account), or run this once to redirect GitHub clones to HTTPS instead:
 > ```bash
