@@ -22,6 +22,9 @@ Runs `airtable-export-schema` to dump a base's full schema (tables, fields, view
 ### `airtable-schema-diff`
 Runs `airtable-diff-schema` to compare two schema JSON exports and produce a Markdown diff showing tables/fields/views that were added, removed, renamed, or had their type changed.
 
+### `airtable-standards-check`
+Runs `airtable-check-standards` to validate a schema JSON file against the [BlueDot Impact Airtable Standards](https://github.com/bluedotimpact/airtable-standards). Outputs a Markdown report grouped by table, listing errors and warnings. No API token or network access needed.
+
 ### `airtable-user-scraping`
 Runs `airtable-scrape-users` to scrape collaborator access data from Airtable bases, grouped by workspace. Outputs per-workspace CSVs showing who has access to what.
 
@@ -54,6 +57,18 @@ Compares two schema JSON files produced by `airtable-export-schema`. Outputs a M
 ```bash
 airtable-diff-schema old_schema.json new_schema.json
 airtable-diff-schema old.json new.json --output diff.md
+```
+
+### `airtable-check-standards`
+
+Validates a schema JSON file against the [BlueDot Impact Airtable Standards](https://github.com/bluedotimpact/airtable-standards). Outputs a Markdown report grouped by table. Exits with code 1 if any errors are found (CI-friendly).
+
+**Dependencies:** none (stdlib only)
+
+```bash
+airtable-check-standards schema.json
+airtable-check-standards schema.json --errors-only        # suppress warnings
+airtable-check-standards schema.json --output report.md   # write to file
 ```
 
 ### `airtable-scrape-users`
@@ -96,7 +111,7 @@ For local testing without installing:
 claude --plugin-dir /path/to/airtable-utils
 ```
 
-Skills are namespaced after install: `/airtable-utils:airtable-scripting`, `/airtable-utils:airtable-schema`, `/airtable-utils:airtable-schema-diff`, `/airtable-utils:airtable-user-scraping`.
+Skills are namespaced after install: `/airtable-utils:airtable-scripting`, `/airtable-utils:airtable-schema`, `/airtable-utils:airtable-schema-diff`, `/airtable-utils:airtable-standards-check`, `/airtable-utils:airtable-user-scraping`.
 
 ### Standalone (no Claude Code plugin needed)
 
