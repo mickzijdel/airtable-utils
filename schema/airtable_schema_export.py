@@ -156,24 +156,27 @@ def main():
     base_name = get_base_info(args.token, args.base)
     print(f"Base name: {base_name}")
     schema = get_base_schema(args.token, args.base)
-    
+
     # Count tables and fields
     num_tables = len(schema.get("tables", []))
     num_fields = sum(len(t.get("fields", [])) for t in schema.get("tables", []))
     num_views = sum(len(t.get("views", [])) for t in schema.get("tables", []))
     print(f"Found {num_tables} tables, {num_fields} fields, {num_views} views")
-    
-    # Output based on format
-    base_name = args.output.rsplit(".", 1)[0] if "." in args.output else args.output
-    
+
+    # Build output filename stem from date, time, base name and app ID
+    now = datetime.now()
+    timestamp = now.strftime("%Y-%m-%d_%H-%M")
+    safe_base_name = base_name.replace(" ", "_").replace("/", "-")
+    file_stem = f"{args.base}_{safe_base_name}_{timestamp}_schema"
+
     if args.format in ("json", "both"):
-        json_file = f"{base_name}.json"
+        json_file = f"{file_stem}.json"
         with open(json_file, "w") as f:
             json.dump(schema, f, indent=2)
         print(f"JSON schema saved to: {json_file}")
-    
+
     if args.format in ("markdown", "both"):
-        md_file = f"{base_name}.md"
+        md_file = f"{file_stem}.md"
         markdown = format_schema_as_markdown(schema, args.base, base_name)
         with open(md_file, "w") as f:
             f.write(markdown)
