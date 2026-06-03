@@ -105,6 +105,12 @@ The repo serves as its own marketplace. Add it once, then install the plugin:
 /plugin install airtable-utils@airtable-utils
 ```
 
+> **SSH error?** If installation fails with `git@github.com: Permission denied (publickey)`, Claude Code is trying to clone via SSH. Either [add an SSH key to your GitHub account](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account), or run this once to redirect GitHub clones to HTTPS instead:
+> ```bash
+> git config --global url."https://github.com/".insteadOf "git@github.com:"
+> ```
+> Then retry the install.
+
 For local testing without installing:
 
 ```bash
