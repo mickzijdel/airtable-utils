@@ -14,6 +14,9 @@ Use this skill when writing scripts for the user to paste into Airtable.
 ### `airtable-schema`
 Runs `airtable-export-schema` to dump a base's full schema (tables, fields, views) to JSON and Markdown. Use this before writing scripts so you have accurate IDs.
 
+### `airtable-schema-diff`
+Runs `airtable-diff-schema` to compare two schema JSON exports and produce a Markdown diff showing tables/fields/views that were added, removed, renamed, or had their type changed.
+
 ### `airtable-user-scraping`
 Runs `airtable-scrape-users` to scrape collaborator access data from Airtable bases, grouped by workspace. Outputs per-workspace CSVs showing who has access to what.
 
@@ -33,6 +36,17 @@ Exports a base's schema via the Airtable API. Writes `{base_id}_{name}_{timestam
 airtable-export-schema --token YOUR_PAT --base appXXXXXXXXXX
 # or use a .env with AIRTABLE_TOKEN and AIRTABLE_BASE_ID
 airtable-export-schema
+```
+
+### `airtable-diff-schema`
+
+Compares two schema JSON files produced by `airtable-export-schema`. Outputs a Markdown diff of tables, fields, and views — detecting renames by entity ID.
+
+**Dependencies:** none (stdlib only)
+
+```bash
+airtable-diff-schema old_schema.json new_schema.json
+airtable-diff-schema old.json new.json --output diff.md
 ```
 
 ### `airtable-scrape-users`
@@ -73,4 +87,4 @@ For local testing without installing:
 claude --plugin-dir /path/to/airtable-utils
 ```
 
-Skills are namespaced after install: `/airtable-utils:airtable-scripting`, `/airtable-utils:airtable-schema`, `/airtable-utils:airtable-user-scraping`.
+Skills are namespaced after install: `/airtable-utils:airtable-scripting`, `/airtable-utils:airtable-schema`, `/airtable-utils:airtable-schema-diff`, `/airtable-utils:airtable-user-scraping`.
