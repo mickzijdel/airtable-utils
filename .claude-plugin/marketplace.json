@@ -13,7 +13,11 @@
       "name": "airtable-utils",
       "displayName": "Airtable Utils",
       "description": "Skills and utilities for working with Airtable: schema export, scripting guidance, and collaborator access scraping.",
-      "source": ".",
+      "source": {
+        "source": "github",
+        "repo": "mickzijdel/airtable_utils",
+        "ref": "main"
+      },
       "category": "productivity",
       "version": "1.0.0",
       "author": {
