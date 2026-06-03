@@ -1,0 +1,59 @@
+# airtable-utils
+
+A Claude Code plugin with skills and utilities for working with Airtable.
+
+## Skills
+
+### `airtable-scripting`
+Comprehensive guidance for writing Airtable scripts — both Scripting Extensions (manual) and Automation Scripts (triggered). Covers the Scripting API, Web API integration, all field types, batching, error handling, and common patterns.
+
+Use this skill when writing scripts for the user to paste into Airtable.
+
+> For Claude to **directly read or write Airtable data**, use the official [`airtable@claude-plugins-official`](https://www.airtable.com) plugin instead, which bundles the official MCP server.
+
+### `airtable-schema`
+Runs `schema/airtable_schema_export.py` to dump a base's full schema (tables, fields, views) to JSON and Markdown. Use this before writing scripts so you have accurate IDs.
+
+### `airtable-user-scraping`
+Runs `user_scraping/airtable_user_scraper.py` to scrape collaborator access data from Airtable bases, grouped by workspace. Outputs per-workspace CSVs showing who has access to what.
+
+> ⚠️ The user scraper violates Airtable's [Acceptable Use Policy](https://www.airtable.com/company/aup). Use at your own risk.
+
+## Utilities
+
+### `schema/airtable_schema_export.py`
+Exports a base's schema via the Airtable API. See [`schema/README.md`](schema/README.md).
+
+**Requirements:** `pip install requests`
+
+```bash
+python schema/airtable_schema_export.py --token YOUR_PAT --base appXXXXXXXXXX
+```
+
+### `user_scraping/airtable_user_scraper.py`
+Scrapes user/collaborator data from the Airtable web UI (the API doesn't expose this on the Team plan). See [`user_scraping/README.md`](user_scraping/README.md).
+
+**Requirements:** `pip install playwright aiohttp && playwright install chromium`
+
+```bash
+python user_scraping/airtable_user_scraper.py --login       # first-time auth
+python user_scraping/airtable_user_scraper.py --from-api --save-config  # discover bases
+python user_scraping/airtable_user_scraper.py               # scrape
+```
+
+## Installation
+
+The repo serves as its own marketplace. Add it once, then install the plugin:
+
+```
+/plugin marketplace add github:mickzijdel/airtable_utils
+/plugin install airtable-utils@airtable-utils
+```
+
+For local testing without installing:
+
+```bash
+claude --plugin-dir /path/to/airtable_utils
+```
+
+Skills are namespaced after install: `/airtable-utils:airtable-scripting`, `/airtable-utils:airtable-schema`, `/airtable-utils:airtable-user-scraping`.
