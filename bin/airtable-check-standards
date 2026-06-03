@@ -112,7 +112,9 @@ def _check_field(field: dict, table: dict) -> list[Violation]:
         v.append(Violation("warning", "field", raw_name, table_name, "field-datetime-at-suffix",
                             f"DateTime field '{raw_name}' in '{table_name}' should end in ' at' (e.g. 'Updated at')."))
 
-    if table_name.lower() in name.lower():
+    table_words = set(table_name.lower().split())
+    field_words = set(name.lower().split())
+    if table_words & field_words:
         v.append(Violation("warning", "field", raw_name, table_name, "field-repeats-table-name",
                             f"Field '{raw_name}' in '{table_name}' repeats the table name — omit it."))
 

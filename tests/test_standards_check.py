@@ -79,6 +79,51 @@ def test_detects_datetime_field_not_ending_in_at():
     assert any(v.rule == "field-datetime-at-suffix" for v in violations)
 
 
+def test_detects_plural_table_name():
+    schema = {
+        "tables": [{
+            "id": "tblX",
+            "name": "Applicants",
+            "description": "Description: test\nLast reviewed on: 2025-01-01",
+            "primaryFieldId": "fldX1",
+            "fields": [{"id": "fldX1", "name": "Name", "type": "singleLineText"}],
+            "views": [{"id": "viwX1", "name": "All", "type": "grid"}],
+        }]
+    }
+    violations = standards.check_schema(schema)
+    assert any(v.rule == "table-singular" for v in violations)
+
+
+def test_detects_field_repeating_table_name():
+    schema = {
+        "tables": [{
+            "id": "tblX",
+            "name": "Applicant",
+            "description": "Description: test\nLast reviewed on: 2025-01-01",
+            "primaryFieldId": "fldX1",
+            "fields": [{"id": "fldX1", "name": "Applicant email", "type": "email"}],
+            "views": [{"id": "viwX1", "name": "All", "type": "grid"}],
+        }]
+    }
+    violations = standards.check_schema(schema)
+    assert any(v.rule == "field-repeats-table-name" for v in violations)
+
+
+def test_field_repeating_table_name_no_partial_match():
+    schema = {
+        "tables": [{
+            "id": "tblX",
+            "name": "Plan",
+            "description": "Description: test\nLast reviewed on: 2025-01-01",
+            "primaryFieldId": "fldX1",
+            "fields": [{"id": "fldX1", "name": "Planned start on", "type": "date"}],
+            "views": [{"id": "viwX1", "name": "All", "type": "grid"}],
+        }]
+    }
+    violations = standards.check_schema(schema)
+    assert not any(v.rule == "field-repeats-table-name" for v in violations)
+
+
 def test_violation_has_expected_shape():
     violations = standards.check_schema(DIRTY_SCHEMA)
     v = violations[0]
