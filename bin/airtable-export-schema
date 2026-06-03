@@ -1,3 +1,8 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["requests"]
+# ///
 """
 Airtable Base Schema Exporter
 
@@ -7,11 +12,10 @@ Downloads the complete schema of an Airtable base including:
 - Views (name, type)
 
 Usage:
-    python airtable_schema_export.py --token YOUR_TOKEN --base BASE_ID [--output schema.json]
-    AIRTABLE_TOKEN=YOUR_TOKEN AIRTABLE_BASE_ID=BASE_ID python airtable_schema_export.py
+    airtable-export-schema --token YOUR_TOKEN --base BASE_ID
+    AIRTABLE_TOKEN=YOUR_TOKEN AIRTABLE_BASE_ID=BASE_ID airtable-export-schema
 
-Requirements:
-    pip install requests
+Credentials can also be placed in a .env file in the current directory.
 """
 
 import argparse
@@ -58,11 +62,11 @@ def get_base_info(token: str, base_id: str) -> str:
 def get_base_schema(token: str, base_id: str) -> dict[str, Any]:
     """
     Fetch the complete schema for an Airtable base.
-    
+
     Args:
         token: Airtable Personal Access Token
         base_id: The base ID (starts with 'app')
-    
+
     Returns:
         Dictionary containing the full base schema
     """
@@ -71,10 +75,10 @@ def get_base_schema(token: str, base_id: str) -> dict[str, Any]:
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
-    
+
     response = requests.get(url, headers=headers)
     response.raise_for_status()
-    
+
     return response.json()
 
 
@@ -96,18 +100,18 @@ def format_schema_as_markdown(schema: dict[str, Any], base_id: str, base_name: s
     lines.append(f"**Base:** {base_name}  ")
     lines.append(f"**App ID:** `{base_id}`  ")
     lines.append(f"**Exported:** {timestamp}\n")
-    
+
     for table in schema.get("tables", []):
         table_name = table.get("name", "Unnamed Table")
         table_id = table.get("id", "")
-        
+
         lines.append(f"\n## Table: {table_name}")
         lines.append(f"**ID:** `{table_id}`")
-        
+
         # Description if present
         if table.get("description"):
             lines.append(f"\n**Description:** {table['description']}")
-        
+
         # Fields
         lines.append("\n### Fields\n")
         lines.append("| # | Field Name | Field ID | Type | Description |")
@@ -131,7 +135,7 @@ def format_schema_as_markdown(schema: dict[str, Any], base_id: str, base_name: s
                 field_desc += f" → Links to `{linked_table}`"
 
             lines.append(f"| {i} | {field_name} | `{field_id}` | {field_type} | {field_desc[:100]}{'...' if len(field_desc) > 100 else ''} |")
-        
+
         # Views
         views = table.get("views", [])
         if views:
@@ -142,7 +146,7 @@ def format_schema_as_markdown(schema: dict[str, Any], base_id: str, base_name: s
                 view_name = view.get("name", "")
                 view_type = view.get("type", "")
                 lines.append(f"| {view_name} | {view_type} |")
-    
+
     return "\n".join(lines)
 
 
@@ -171,7 +175,7 @@ def main():
         default="both",
         help="Output format"
     )
-    
+
     args = parser.parse_args()
 
     if not args.token:

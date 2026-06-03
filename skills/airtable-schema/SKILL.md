@@ -1,13 +1,13 @@
 ---
 name: airtable-schema
-description: "Export and inspect an Airtable base schema (tables, fields, views) using the airtable_schema_export.py utility. Use when the user wants to export a base schema, or when you need schema context before writing Airtable scripts."
+description: "Export and inspect an Airtable base schema (tables, fields, views) using the airtable-export-schema utility. Use when the user wants to export a base schema, or when you need schema context before writing Airtable scripts."
 ---
 
 # Airtable Schema Export Skill
 
 ## Purpose
 
-This skill covers running the `schema/airtable_schema_export.py` utility to dump an Airtable base's full schema — tables, fields (with types and descriptions), and views — to JSON and/or Markdown.
+This skill covers running `airtable-export-schema` to dump an Airtable base's full schema — tables, fields (with types and descriptions), and views — to JSON and/or Markdown.
 
 ## Direct Airtable Access via MCP
 
@@ -21,11 +21,12 @@ This skill is for exporting schema metadata to a local file.
 
 ## Prerequisites
 
-```bash
-pip install requests
-```
+Install dependencies (first time only):
 
-The script lives at `schema/airtable_schema_export.py` relative to the repo root.
+```bash
+uv run --script bin/airtable-export-schema --help   # installs deps automatically via uv
+# or manually: pip install requests
+```
 
 ## Personal Access Token (PAT)
 
@@ -43,23 +44,20 @@ The token must have access to the target base(s).
 
 ```bash
 # Using CLI flags
-python schema/airtable_schema_export.py --token YOUR_PAT --base appXXXXXXXXXX
+airtable-export-schema --token YOUR_PAT --base appXXXXXXXXXX
 
 # Using environment variables (preferred for repeated use)
 export AIRTABLE_TOKEN=patXXXXXXXXXX
 export AIRTABLE_BASE_ID=appXXXXXXXXXX
-python schema/airtable_schema_export.py
+airtable-export-schema
 
 # Choose output format (default: both)
-python schema/airtable_schema_export.py \
-  --token YOUR_PAT \
-  --base appXXXXXXXXXX \
-  --format json        # json | markdown | both
+airtable-export-schema --token YOUR_PAT --base appXXXXXXXXXX --format json
 ```
 
 ## Using a .env File (Recommended)
 
-Instead of passing flags or exporting shell variables, place a `.env` file in the directory where you run the script (or next to the script itself). The script loads it automatically, no extra packages needed.
+Place a `.env` file in the directory where you run the command. The script loads it automatically.
 
 ```dotenv
 # .env
@@ -70,10 +68,10 @@ AIRTABLE_BASE_ID=appXXXXXXXXXX
 Then just run:
 
 ```bash
-python schema/airtable_schema_export.py
+airtable-export-schema
 ```
 
-**Per-folder credentials:** Because the script looks for `.env` in the *current working directory* first, you can keep a separate `.env` per project folder, each pointing at a different base or token. Run the script from that folder and it picks up the right credentials automatically.
+**Per-folder credentials:** Because the script looks for `.env` in the *current working directory* first, you can keep a separate `.env` per project folder, each pointing at a different base or token.
 
 Output files are written to the current directory, named:
 ```
@@ -109,6 +107,6 @@ Output files are written to the current directory, named:
 
 When writing Airtable scripts, always export the schema first so you have accurate table, field, and view IDs. Feed the JSON output as context when using the `airtable-scripting` skill.
 
-1. Export schema: `python schema/airtable_schema_export.py --token ... --base ...`
+1. Export schema: `airtable-export-schema --token ... --base ...`
 2. Read the output JSON to find exact IDs for tables, fields, and views
 3. Use those IDs (never names) in scripts — see the `airtable-scripting` skill

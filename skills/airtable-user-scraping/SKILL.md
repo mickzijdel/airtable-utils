@@ -1,13 +1,13 @@
 ---
 name: airtable-user-scraping
-description: "Scrape user/collaborator access data from Airtable bases using the airtable_user_scraper.py utility. Use when the user wants to audit who has access to which Airtable bases and at what permission level."
+description: "Scrape user/collaborator access data from Airtable bases using the airtable-scrape-users utility. Use when the user wants to audit who has access to which Airtable bases and at what permission level."
 ---
 
 # Airtable User Scraper Skill
 
 ## Purpose
 
-This skill covers running `user_scraping/airtable_user_scraper.py` to extract user/collaborator data from Airtable bases grouped by workspace. Airtable's API does not expose collaborator data on the Team plan; this tool scrapes it from the web UI instead.
+This skill covers running `airtable-scrape-users` to extract user/collaborator data from Airtable bases grouped by workspace. Airtable's API does not expose collaborator data on the Team plan; this tool scrapes it from the web UI instead.
 
 ## ⚠️ Important: Acceptable Use Policy
 
@@ -15,84 +15,82 @@ This skill covers running `user_scraping/airtable_user_scraper.py` to extract us
 
 ## Prerequisites
 
-```bash
-pip install playwright aiohttp
-playwright install chromium
-```
+Install Playwright's browser (first time only):
 
-The script lives at `user_scraping/airtable_user_scraper.py` relative to the repo root.
+```bash
+playwright install chromium
+# Dependencies are handled automatically by uv on first run
+```
 
 ## Workflow
 
 ### Step 1: Login (once per ~30 days)
 
-Opens a browser for manual authentication. Auth cookies are saved to `user_scraping/output/airtable_auth_state.json`.
+Opens a browser for manual authentication. Auth cookies are saved to `output/airtable_auth_state.json`.
 
 ```bash
-python user_scraping/airtable_user_scraper.py --login
+airtable-scrape-users --login
 ```
 
 Re-run `--login` if scraping starts failing (cookies expire after ~30 days).
 
 ### Step 2: Discover bases and save workspace config (once, or when bases change)
 
-Fetches all accessible bases from the Airtable API and saves workspace groupings to `user_scraping/output/airtable_scraper_config.json`.
+Fetches all accessible bases from the Airtable API and saves workspace groupings to `output/airtable_scraper_config.json`.
 
 ```bash
 export AIRTABLE_API_KEY=patXXXXXXXXXX
-python user_scraping/airtable_user_scraper.py --from-api --save-config
+airtable-scrape-users --from-api --save-config
 ```
 
-**Tip:** Instead of exporting the variable, place a `.env` file in the directory you run the script from (or next to the script). It is loaded automatically, no extra packages needed.
+**Tip:** Place a `.env` file in the directory you run the command from. It is loaded automatically.
 
 ```dotenv
 # .env
 AIRTABLE_API_KEY=patXXXXXXXXXX
 ```
 
-Because the script looks for `.env` in the *current working directory* first, you can keep separate `.env` files per project folder to switch between Airtable accounts without touching environment variables.
-
 ### Step 3: Scrape user data
 
 Uses the saved config. Shows changes compared to the previous run.
 
 ```bash
-python user_scraping/airtable_user_scraper.py
+airtable-scrape-users
 ```
 
 ## Common Options
 
 ```bash
 # Filter to specific workspace(s) by name or ID
-python user_scraping/airtable_user_scraper.py --workspace "Operations"
-python user_scraping/airtable_user_scraper.py --workspace "Operations" "Research"
+airtable-scrape-users --workspace "Operations"
+airtable-scrape-users --workspace "Operations" "Research"
 
 # Scrape specific base IDs only
-python user_scraping/airtable_user_scraper.py --bases appXXXXXXXXXX appYYYYYYYYYY
+airtable-scrape-users --bases appXXXXXXXXXX appYYYYYYYYYY
 
 # Export CSVs from the latest JSON without re-scraping
-python user_scraping/airtable_user_scraper.py --export-csv-from-json
+airtable-scrape-users --export-csv-from-json
 
 # Export CSVs from a specific JSON file
-python user_scraping/airtable_user_scraper.py --export-csv-from-json user_scraping/output/airtable_users_export.20260123_114935.json
+airtable-scrape-users --export-csv-from-json output/airtable_users_export.20260123_114935.json
 
 # Skip change comparison
-python user_scraping/airtable_user_scraper.py --no-compare
+airtable-scrape-users --no-compare
 
 # Slow down requests (default: 1.0 second between bases)
-python user_scraping/airtable_user_scraper.py --delay 2
+airtable-scrape-users --delay 2
 
 # Debug: show browser and save diagnostic HTML
-python user_scraping/airtable_user_scraper.py --no-headless --debug
+airtable-scrape-users --no-headless --debug
 ```
 
 ## Output Files
 
-All output is written to `user_scraping/output/`:
+All output is written to `output/` in the current working directory:
 
 | File | Contents |
 |------|---------|
-| `airtable_auth_state.json` | Browser cookies — add to `.gitignore` |
+| `airtable_auth_state.json` | Browser cookies — gitignored |
 | `airtable_scraper_config.json` | Workspace/base mapping |
 | `airtable_users_export.json` | Latest results |
 | `airtable_users_export.YYYYMMDD_HHMMSS.json` | Backup of previous run |

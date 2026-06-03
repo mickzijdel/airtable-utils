@@ -1,19 +1,25 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["playwright", "aiohttp"]
+# ///
 """
 Airtable Base User Scraper
 
-Scrapes user access data from Airtable bases by intercepting the 
+Scrapes user access data from Airtable bases by intercepting the
 window.resolveLiveappDataPromise() initialization call.
 
 Usage:
-    1. First run: python airtable_user_scraper.py --login
+    1. First run: airtable-scrape-users --login
        (Opens browser for manual login, saves auth state)
-    2. Subsequent runs: python airtable_user_scraper.py
+    2. Subsequent runs: airtable-scrape-users
        (Uses saved auth to scrape all bases)
 
-Requirements:
-    pip install playwright aiohttp --break-system-packages
+Note: playwright requires a one-time browser install:
     playwright install chromium
+
+Credentials can be placed in a .env file in the current directory:
+    AIRTABLE_API_KEY=patXXXXXXXXXX
 """
 
 import asyncio
@@ -64,11 +70,11 @@ class UserInfo:
     first_name: str
     last_name: str
     permission_level: str = "unknown"
-    
+
     @property
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
-    
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
@@ -100,7 +106,7 @@ class BaseAccessReport:
     users: list[UserInfo] = field(default_factory=list)
     scrape_time: str = field(default_factory=lambda: datetime.now().isoformat())
     error: Optional[str] = None
-    
+
     def to_dict(self) -> dict:
         return {
             "base_id": self.base_id,
@@ -147,7 +153,7 @@ class AirtableScraper:
     - rawWorkspaces: workspace metadata
     - rawApplications: base metadata
     """
-    
+
     def __init__(
         self,
         headless: bool = True,
@@ -163,17 +169,17 @@ class AirtableScraper:
         self.context_recycle_interval = context_recycle_interval
         self.max_retries = max_retries
         self._requests_since_recycle = 0
-    
+
     async def __aenter__(self):
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(headless=self.headless)
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.browser:
             await self.browser.close()
         await self.playwright.stop()
-    
+
     async def login_and_save_auth(self) -> None:
         """
         Opens a browser for manual login, then saves the auth state.
@@ -181,21 +187,21 @@ class AirtableScraper:
         """
         print("Opening browser for login...")
         print("Please log in to Airtable, then press Enter in this terminal.")
-        
+
         # Non-headless for manual login
         context = await self.browser.new_context()
         page = await context.new_page()
-        
+
         await page.goto("https://airtable.com/login")
-        
+
         input("Press Enter after you've logged in and can see your bases...")
-        
+
         # Save auth state
         await context.storage_state(path=str(AUTH_STATE_FILE))
         print(f"Auth state saved to {AUTH_STATE_FILE}")
-        
+
         await context.close()
-    
+
     async def load_auth(self) -> BrowserContext:
         """Loads saved auth state into a new browser context."""
         if not AUTH_STATE_FILE.exists():
@@ -203,7 +209,7 @@ class AirtableScraper:
                 f"Auth state file not found: {AUTH_STATE_FILE}\n"
                 "Run with --login first to authenticate."
             )
-        
+
         self.context = await self.browser.new_context(
             storage_state=str(AUTH_STATE_FILE)
         )
@@ -337,17 +343,17 @@ class AirtableScraper:
             workspace_name="Unknown",
             error=last_error or "Unknown error"
         )
-    
+
     async def _extract_from_source(self, page: Page) -> Optional[dict]:
         """
         Fallback: extract init data from page HTML source.
         Looks for window.resolveLiveappDataPromise({...}) in script tags.
         """
         content = await page.content()
-        
+
         # Find the function call in the HTML
         pattern = r'window\.resolveLiveappDataPromise\((\{.*?\})\);'
-        
+
         # This is tricky because the JSON can be huge and span lines
         # Try a different approach: find the script and parse it
         match = re.search(
@@ -355,7 +361,7 @@ class AirtableScraper:
             content,
             re.DOTALL
         )
-        
+
         if match:
             try:
                 return json.loads(match.group(1))
@@ -457,7 +463,7 @@ class AirtableScraper:
     def _parse_access_data(self, base_id: str, data: dict) -> BaseAccessReport:
         """
         Parses the captured initialization data to extract user access info.
-        
+
         The data structure is:
         - rawApplications: {base_id: {name, ...}}
         - rawWorkspaces: {workspace_id: {name, ...}}
@@ -469,12 +475,12 @@ class AirtableScraper:
         raw_apps = data.get("rawApplications", {})
         app_info = raw_apps.get(base_id, {})
         base_name = app_info.get("name", "Unknown")
-        
+
         # Get workspace info
         raw_workspaces = data.get("rawWorkspaces", {})
         workspace_id = "Unknown"
         workspace_name = "Unknown"
-        
+
         # Find which workspace this base belongs to
         for ws_id, ws_data in raw_workspaces.items():
             if ws_id == "wspSHARED00000000":
@@ -484,10 +490,10 @@ class AirtableScraper:
                 workspace_id = ws_id
                 workspace_name = ws_data.get("name", "Unknown")
                 break
-        
+
         # Get all users
         raw_users = data.get("rawUsers", {})
-        
+
         # Get collaborators (both workspace-level and base-level)
         workspace_collaborators = data.get("collaboratorsByWorkspaceId", {}).get(
             workspace_id, []
@@ -495,33 +501,33 @@ class AirtableScraper:
         base_collaborators = data.get("collaboratorsByApplicationId", {}).get(
             base_id, []
         )
-        
+
         # Build user permission map (base-level overrides workspace-level)
         user_permissions: dict[str, str] = {}
-        
+
         for collab in workspace_collaborators:
             if collab.get("type") == 0:  # User type
                 user_id = collab.get("userId")
                 if user_id:
                     user_permissions[user_id] = collab.get("permissionLevel", "unknown")
-        
+
         for collab in base_collaborators:
             if collab.get("type") == 0:  # User type
                 user_id = collab.get("userId")
                 if user_id:
                     user_permissions[user_id] = collab.get("permissionLevel", "unknown")
-        
+
         # Build user list
         users = []
         for user_id, permission in user_permissions.items():
             user_data = raw_users.get(user_id, {})
-            
+
             # Skip service accounts
             if user_data.get("isServiceAccount"):
                 continue
             if user_id in ("usrAISERVICE00000", "usrEXTERNALTBLSVC", "usrWORKFLOWEXESVC"):
                 continue
-            
+
             users.append(UserInfo(
                 id=user_id,
                 email=user_data.get("email", ""),
@@ -529,10 +535,10 @@ class AirtableScraper:
                 last_name=user_data.get("lastName", ""),
                 permission_level=permission,
             ))
-        
+
         # Sort by email for consistent output
         users.sort(key=lambda u: u.email.lower())
-        
+
         return BaseAccessReport(
             base_id=base_id,
             base_name=base_name,
@@ -540,7 +546,7 @@ class AirtableScraper:
             workspace_name=workspace_name,
             users=users,
         )
-    
+
     async def scrape_multiple_bases(
         self,
         base_ids: list[str],
@@ -609,27 +615,27 @@ async def fetch_base_ids_from_api() -> list[str]:
             f"Set {AIRTABLE_API_KEY_ENV} environment variable to fetch base list, "
             "or provide base IDs directly."
         )
-    
+
     import aiohttp
-    
+
     async with aiohttp.ClientSession() as session:
         headers = {"Authorization": f"Bearer {api_key}"}
         bases = []
         offset = None
-        
+
         while True:
             url = "https://api.airtable.com/v0/meta/bases"
             if offset:
                 url += f"?offset={offset}"
-            
+
             async with session.get(url, headers=headers) as resp:
                 data = await resp.json()
                 bases.extend(data.get("bases", []))
                 offset = data.get("offset")
-                
+
                 if not offset:
                     break
-        
+
         return [b["id"] for b in bases]
 
 
@@ -775,20 +781,20 @@ def export_aggregated_csvs(reports: list[BaseAccessReport]):
 def generate_workspace_summary(reports: list[BaseAccessReport]) -> dict:
     """
     Generate a summary report grouped by workspace.
-    
+
     Returns dict with per-workspace stats:
     - Base count
     - User count (unique per workspace)
     - Permission breakdown
     """
     summary = {}
-    
+
     for report in reports:
         if report.error:
             continue
-        
+
         ws_id = report.workspace_id or "unknown"
-        
+
         if ws_id not in summary:
             summary[ws_id] = {
                 "workspace_id": ws_id,
@@ -796,14 +802,14 @@ def generate_workspace_summary(reports: list[BaseAccessReport]) -> dict:
                 "bases": [],
                 "users": {},  # email -> {bases: [], permissions: set()}
             }
-        
+
         ws = summary[ws_id]
         ws["bases"].append({
             "base_id": report.base_id,
             "base_name": report.base_name,
             "user_count": len(report.users),
         })
-        
+
         for user in report.users:
             if user.email not in ws["users"]:
                 ws["users"][user.email] = {
@@ -813,7 +819,7 @@ def generate_workspace_summary(reports: list[BaseAccessReport]) -> dict:
                 }
             ws["users"][user.email]["bases"].append(report.base_id)
             ws["users"][user.email]["permissions"].add(user.permission_level)
-    
+
     # Convert to serializable format and add stats
     result = {}
     for ws_id, ws in summary.items():
@@ -826,7 +832,7 @@ def generate_workspace_summary(reports: list[BaseAccessReport]) -> dict:
                 "permissions": list(data["permissions"]),
             })
         users_list.sort(key=lambda u: u["email"])
-        
+
         result[ws_id] = {
             "workspace_id": ws_id,
             "workspace_name": ws["workspace_name"],
@@ -835,29 +841,29 @@ def generate_workspace_summary(reports: list[BaseAccessReport]) -> dict:
             "bases": ws["bases"],
             "users": users_list,
         }
-    
+
     return result
 
 
 def print_workspace_summary(reports: list[BaseAccessReport]) -> None:
     """Print a formatted workspace summary to console."""
     summary = generate_workspace_summary(reports)
-    
+
     print("\n" + "=" * 60)
     print("WORKSPACE SUMMARY")
     print("=" * 60)
-    
+
     for ws_id, ws in summary.items():
         print(f"\n📁 {ws['workspace_name']} ({ws_id})")
         print(f"   Bases: {ws['base_count']}")
         print(f"   Unique users: {ws['unique_user_count']}")
-        
+
         # Permission breakdown
         perm_counts = {}
         for user in ws["users"]:
             for perm in user["permissions"]:
                 perm_counts[perm] = perm_counts.get(perm, 0) + 1
-        
+
         if perm_counts:
             perm_str = ", ".join(f"{p}: {c}" for p, c in sorted(perm_counts.items()))
             print(f"   Permissions: {perm_str}")
@@ -866,7 +872,7 @@ def print_workspace_summary(reports: list[BaseAccessReport]) -> None:
 def load_config() -> dict:
     """
     Load configuration from config file.
-    
+
     Config structure:
     {
         "workspaces": {
@@ -903,13 +909,13 @@ def get_workspace_base_ids(config: dict, workspace_filter: list[str]) -> list[st
     """Get base IDs for specific workspaces (by ID or name)."""
     base_ids = []
     workspaces = config.get("workspaces", {})
-    
+
     for ws_id, ws_data in workspaces.items():
         ws_name = ws_data.get("name", "")
         # Match by ID or name (case-insensitive)
         if ws_id in workspace_filter or ws_name.lower() in [w.lower() for w in workspace_filter]:
             base_ids.extend(ws_data.get("base_ids", []))
-    
+
     return base_ids
 
 
@@ -919,7 +925,7 @@ def update_config_from_reports(config: dict, reports: list[BaseAccessReport]) ->
     Groups bases by their workspace.
     """
     workspaces = config.get("workspaces", {})
-    
+
     for report in reports:
         if report.error:
             continue
@@ -931,15 +937,15 @@ def update_config_from_reports(config: dict, reports: list[BaseAccessReport]) ->
                 "name": report.workspace_name,
                 "base_ids": []
             }
-        
+
         # Update workspace name if we have a better one
         if report.workspace_name and report.workspace_name != "Unknown":
             workspaces[ws_id]["name"] = report.workspace_name
-        
+
         # Add base if not already present
         if report.base_id not in workspaces[ws_id]["base_ids"]:
             workspaces[ws_id]["base_ids"].append(report.base_id)
-    
+
     config["workspaces"] = workspaces
     return config
 
@@ -947,11 +953,11 @@ def update_config_from_reports(config: dict, reports: list[BaseAccessReport]) ->
 def print_config_summary(config: dict) -> None:
     """Print a summary of configured workspaces and bases."""
     workspaces = config.get("workspaces", {})
-    
+
     if not workspaces:
         print("No workspaces configured.")
         return
-    
+
     print(f"\nConfigured workspaces ({len(workspaces)}):")
     for ws_id, ws_data in workspaces.items():
         name = ws_data.get("name", "Unknown")
@@ -962,10 +968,10 @@ def print_config_summary(config: dict) -> None:
 def compare_reports(old_file: Path, new_reports: list[BaseAccessReport]) -> dict:
     """
     Compare new results with previous run to identify changes.
-    
+
     Returns dict with:
     - added_users: users who gained access
-    - removed_users: users who lost access  
+    - removed_users: users who lost access
     - permission_changes: users whose permissions changed
     - new_bases: bases not in previous run
     """
@@ -976,36 +982,36 @@ def compare_reports(old_file: Path, new_reports: list[BaseAccessReport]) -> dict
         "new_bases": [],
         "removed_bases": [],
     }
-    
+
     if not old_file.exists():
         return changes
-    
+
     with open(old_file, "r") as f:
         old_data = json.load(f)
-    
+
     old_bases = {b["base_id"]: b for b in old_data.get("bases", [])}
     new_bases = {r.base_id: r for r in new_reports}
-    
+
     # Find new/removed bases
     for base_id in new_bases:
         if base_id not in old_bases:
             changes["new_bases"].append(base_id)
-    
+
     for base_id in old_bases:
         if base_id not in new_bases:
             changes["removed_bases"].append(base_id)
-    
+
     # Compare users per base
     for base_id, new_report in new_bases.items():
         if base_id not in old_bases:
             continue
-        
+
         old_base = old_bases[base_id]
         old_users = {u["email"]: u for u in old_base.get("users", [])}
         new_users = {u.email: u for u in new_report.users}
-        
+
         base_name = new_report.base_name
-        
+
         # Added users
         for email in new_users:
             if email not in old_users:
@@ -1016,7 +1022,7 @@ def compare_reports(old_file: Path, new_reports: list[BaseAccessReport]) -> dict
                     "name": new_users[email].full_name,
                     "permission": new_users[email].permission_level,
                 })
-        
+
         # Removed users
         for email in old_users:
             if email not in new_users:
@@ -1026,7 +1032,7 @@ def compare_reports(old_file: Path, new_reports: list[BaseAccessReport]) -> dict
                     "email": email,
                     "name": old_users[email].get("name", ""),
                 })
-        
+
         # Permission changes
         for email in new_users:
             if email in old_users:
@@ -1040,7 +1046,7 @@ def compare_reports(old_file: Path, new_reports: list[BaseAccessReport]) -> dict
                         "old_permission": old_perm,
                         "new_permission": new_perm,
                     })
-    
+
     return changes
 
 
@@ -1049,45 +1055,45 @@ def print_changes(changes: dict) -> None:
     print("\n" + "=" * 50)
     print("CHANGES SINCE LAST RUN")
     print("=" * 50)
-    
+
     if changes["new_bases"]:
         print(f"\n📦 New bases ({len(changes['new_bases'])}):")
         for base_id in changes["new_bases"]:
             print(f"  + {base_id}")
-    
+
     if changes["removed_bases"]:
         print(f"\n📦 Removed bases ({len(changes['removed_bases'])}):")
         for base_id in changes["removed_bases"]:
             print(f"  - {base_id}")
-    
+
     if changes["added_users"]:
         print(f"\n👤 Users gained access ({len(changes['added_users'])}):")
         for u in changes["added_users"]:
             print(f"  + {u['email']} → {u['base_name']} ({u['permission']})")
-    
+
     if changes["removed_users"]:
         print(f"\n👤 Users lost access ({len(changes['removed_users'])}):")
         for u in changes["removed_users"]:
             print(f"  - {u['email']} ✗ {u['base_name']}")
-    
+
     if changes["permission_changes"]:
         print(f"\n🔑 Permission changes ({len(changes['permission_changes'])}):")
         for u in changes["permission_changes"]:
             print(f"  ~ {u['email']} @ {u['base_name']}: {u['old_permission']} → {u['new_permission']}")
-    
-    total = (len(changes["added_users"]) + len(changes["removed_users"]) + 
+
+    total = (len(changes["added_users"]) + len(changes["removed_users"]) +
              len(changes["permission_changes"]) + len(changes["new_bases"]) +
              len(changes["removed_bases"]))
-    
+
     if total == 0:
         print("\n✓ No changes detected")
-    
+
     print("")
 
 
 async def main():
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Scrape Airtable base user access data")
     parser.add_argument("--login", action="store_true", help="Login and save auth state")
     parser.add_argument("--bases", nargs="+", help="Specific base IDs to scrape")
@@ -1113,7 +1119,7 @@ async def main():
 
     # Load config
     config = load_config()
-    
+
     # Show config and exit
     if args.show_config:
         print_config_summary(config)
@@ -1146,7 +1152,7 @@ async def main():
             scraper.browser = await scraper.playwright.chromium.launch(headless=False)
             await scraper.login_and_save_auth()
             return
-        
+
         # Get base IDs
         if args.bases:
             base_ids = args.bases
@@ -1177,9 +1183,9 @@ async def main():
             print("  --workspace NAME/ID    Filter to specific workspace from config")
             print("  --show-config          Show current configuration")
             print("\nFirst run? Try:")
-            print("  python airtable_user_scraper.py --from-api --save-config")
+            print("  airtable-scrape-users --from-api --save-config")
             return
-        
+
         # Back up previous output
         previous_output = None
         if OUTPUT_FILE.exists() and not args.no_compare:
@@ -1188,28 +1194,28 @@ async def main():
             shutil.copy(OUTPUT_FILE, backup_path)
             previous_output = backup_path
             print(f"Previous output backed up to {backup_path}")
-        
+
         # Scrape
         reports = await scraper.scrape_multiple_bases(
             base_ids,
             delay_seconds=args.delay,
             max_delay_seconds=args.max_delay,
         )
-        
+
         # Update config with workspace info from results
         if args.save_config:
             config = update_config_from_reports(config, reports)
             save_config(config)
             print_config_summary(config)
-        
+
         # Compare with previous run
         if previous_output and not args.no_compare:
             changes = compare_reports(previous_output, reports)
             print_changes(changes)
-        
+
         # Print workspace summary
         print_workspace_summary(reports)
-        
+
         # Save JSON output
         output = {
             "scrape_time": datetime.now().isoformat(),
@@ -1219,10 +1225,10 @@ async def main():
             "workspace_summary": generate_workspace_summary(reports),
             "bases": [r.to_dict() for r in reports]
         }
-        
+
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
             json.dump(output, f, indent=2)
-        
+
         print(f"\nResults saved to {OUTPUT_FILE}")
 
         # Aggregated CSV exports (always generated)
@@ -1233,7 +1239,7 @@ async def main():
         print(f"  Scraped: {len(reports)} bases")
         print(f"  Successful: {output['successful']}")
         print(f"  Failed: {output['failed']}")
-        
+
         # Unique users across all bases
         all_users = set()
         for r in reports:
