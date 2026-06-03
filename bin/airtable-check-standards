@@ -1,0 +1,190 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""
+Airtable Standards Checker
+
+Validates an Airtable schema JSON export against the BlueDot Impact Airtable
+Standards: https://github.com/bluedotimpact/airtable-standards
+
+Exits with code 1 if any errors are found (CI-friendly).
+
+Usage:
+    airtable-check-standards schema.json
+    airtable-check-standards schema.json --errors-only
+    airtable-check-standards schema.json --output report.md
+"""
+
+import argparse
+import json
+import re
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Violation dataclass
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Violation:
+    severity: str       # 'error' | 'warning'
+    entity_type: str    # 'table' | 'field' | 'view'
+    entity_name: str
+    table_name: str
+    rule: str
+    message: str
+
+    def __repr__(self) -> str:
+        return f"Violation({self.severity}, {self.rule}, {self.entity_name!r})"
+
+
+# ---------------------------------------------------------------------------
+# Checks
+# ---------------------------------------------------------------------------
+
+_DESCRIPTION_REQUIRED_KEYS = {"Description", "Last reviewed on"}
+_PREFIX_RE = re.compile(r"^\[.*?\]\s*")
+_NON_PLURAL_SUFFIXES = ("ss", "us", "is", "ness", "ous", "ious", "ess", "status", "progress")
+
+
+def check_schema(schema: dict) -> list[Violation]:
+    violations = []
+    for table in schema.get("tables", []):
+        violations.extend(_check_table(table))
+    return violations
+
+
+def _check_table(table: dict) -> list[Violation]:
+    v: list[Violation] = []
+    name = table["name"]
+
+    if name and name[0] != name[0].upper():
+        v.append(Violation("error", "table", name, name, "table-sentence-case",
+                            f"Table '{name}' should start with an uppercase letter."))
+
+    lower = name.lower()
+    if lower.endswith("s") and not any(lower.endswith(s) for s in _NON_PLURAL_SUFFIXES):
+        v.append(Violation("warning", "table", name, name, "table-singular",
+                            f"Table '{name}' appears plural. Table names should be singular (e.g. 'Applicant')."))
+
+    desc = table.get("description") or ""
+    desc_keys = {line.split(":")[0].strip() for line in desc.splitlines() if ":" in line}
+    missing = _DESCRIPTION_REQUIRED_KEYS - desc_keys
+    if missing:
+        v.append(Violation("warning", "table", name, name, "table-description-keys",
+                            f"Table '{name}' description missing keys: {', '.join(sorted(missing))}."))
+
+    view_names = [view["name"] for view in table.get("views", [])]
+    if "All" not in view_names:
+        v.append(Violation("warning", "table", name, name, "table-missing-all-view",
+                            f"Table '{name}' has no 'All' view showing all records without filters."))
+
+    for field in table.get("fields", []):
+        v.extend(_check_field(field, table))
+
+    return v
+
+
+def _check_field(field: dict, table: dict) -> list[Violation]:
+    v: list[Violation] = []
+    raw_name = field["name"]
+    name = _PREFIX_RE.sub("", raw_name).strip()
+    table_name = table["name"]
+    ftype = field["type"]
+
+    if name and name[0] != name[0].upper():
+        v.append(Violation("error", "field", raw_name, table_name, "field-sentence-case",
+                            f"Field '{raw_name}' in '{table_name}' should start with an uppercase letter."))
+
+    if ftype == "checkbox" and not name.startswith("Is "):
+        v.append(Violation("warning", "field", raw_name, table_name, "field-boolean-is-prefix",
+                            f"Checkbox '{raw_name}' in '{table_name}' should start with 'Is ' (e.g. 'Is approved')."))
+
+    if ftype == "date" and not name.endswith(" on"):
+        v.append(Violation("warning", "field", raw_name, table_name, "field-date-on-suffix",
+                            f"Date field '{raw_name}' in '{table_name}' should end in ' on' (e.g. 'Applied on')."))
+
+    if ftype == "dateTime" and not name.endswith(" at"):
+        v.append(Violation("warning", "field", raw_name, table_name, "field-datetime-at-suffix",
+                            f"DateTime field '{raw_name}' in '{table_name}' should end in ' at' (e.g. 'Updated at')."))
+
+    if table_name.lower() in name.lower():
+        v.append(Violation("warning", "field", raw_name, table_name, "field-repeats-table-name",
+                            f"Field '{raw_name}' in '{table_name}' repeats the table name — omit it."))
+
+    return v
+
+
+# ---------------------------------------------------------------------------
+# Output formatter
+# ---------------------------------------------------------------------------
+
+def format_violations(violations: list[Violation]) -> str:
+    if not violations:
+        return "No violations found. Schema looks good!\n"
+
+    by_table: dict[str, list[Violation]] = {}
+    for v in violations:
+        by_table.setdefault(v.table_name, []).append(v)
+
+    errors_total = sum(1 for v in violations if v.severity == "error")
+    warnings_total = len(violations) - errors_total
+    lines = [f"# Standards check: {len(violations)} violation(s) — {errors_total} error(s), {warnings_total} warning(s)\n"]
+
+    for table_name, tvs in sorted(by_table.items()):
+        errors = [v for v in tvs if v.severity == "error"]
+        warnings = [v for v in tvs if v.severity == "warning"]
+        lines.append(f"## {table_name}")
+        for v in errors:
+            lines.append(f"- **ERROR** `{v.rule}` — {v.message}")
+        for v in warnings:
+            lines.append(f"- warning `{v.rule}` — {v.message}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Check an Airtable schema against BlueDot Impact Airtable Standards"
+    )
+    parser.add_argument("schema", help="Path to schema JSON file")
+    parser.add_argument("--output", "-o", help="Write report to this file (default: stdout)")
+    parser.add_argument("--errors-only", action="store_true", help="Only show errors, not warnings")
+    args = parser.parse_args()
+
+    schema_path = Path(args.schema)
+    if not schema_path.exists():
+        print(f"Error: {schema_path} not found", file=sys.stderr)
+        sys.exit(1)
+
+    schema = json.loads(schema_path.read_text())
+    violations = check_schema(schema)
+
+    if args.errors_only:
+        violations = [v for v in violations if v.severity == "error"]
+
+    report = format_violations(violations)
+
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(report)
+        print(f"Report written to {out}")
+    else:
+        print(report)
+
+    if any(v.severity == "error" for v in violations):
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
