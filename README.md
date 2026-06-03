@@ -1,13 +1,18 @@
 # airtable-utils
 
-A Claude Code plugin with skills and utilities for working with Airtable.
+A collection of useful tools and guidance for working with Airtable. Can be used in two ways:
+
+- **As a Claude Code plugin** — install once and skills + CLI tools are automatically available to Claude
+- **Standalone** — run the `bin/` scripts directly from the command line (requires [`uv`](https://docs.astral.sh/uv/)), or copy the `airtable-scripting` skill into any Claude (Code) session manually
 
 ## Skills
 
 ### `airtable-scripting`
-Comprehensive guidance for writing Airtable scripts — both Scripting Extensions (manual) and Automation Scripts (triggered). Covers the Scripting API, Web API integration, all field types, batching, error handling, and common patterns.
+Comprehensive guidance for writing Airtable scripts both as Scripting Extensions (manual) and Automation Scripts (triggered). Covers the Scripting API, Web API integration, all field types, batching, error handling, and common patterns.
 
 Use this skill when writing scripts for the user to paste into Airtable.
+
+> **Standalone use:** You can use this skill without installing the plugin. Copy [`skills/airtable-scripting.md`](skills/airtable-scripting.md) and load it manually in any Claude Code session.
 
 > For Claude to **directly read or write Airtable data**, use the official [`airtable@claude-plugins-official`](https://www.airtable.com) plugin instead, which bundles the official MCP server.
 
@@ -24,7 +29,9 @@ Runs `airtable-scrape-users` to scrape collaborator access data from Airtable ba
 
 ## Utilities
 
-Scripts live in `bin/` and are automatically on `PATH` when the plugin is enabled. They use [PEP 723 inline script metadata](https://peps.python.org/pep-0723/) so `uv` handles dependencies automatically.
+Scripts live in `bin/` and work both as standalone CLI tools and as plugin-managed commands. They use [PEP 723 inline script metadata](https://peps.python.org/pep-0723/) so `uv` handles dependencies automatically — no virtualenv setup needed.
+
+> **Standalone use:** Clone the repo, make sure [`uv`](https://docs.astral.sh/uv/) is on your PATH, and run `bin/airtable-export-schema` directly (or add `bin/` to your PATH).
 
 ### `airtable-export-schema`
 
@@ -74,6 +81,8 @@ AIRTABLE_BASE_ID=appXXXXXXXX       # optional, for airtable-export-schema
 
 ## Installation
 
+### As a Claude Code plugin
+
 The repo serves as its own marketplace. Add it once, then install the plugin:
 
 ```
@@ -88,3 +97,12 @@ claude --plugin-dir /path/to/airtable-utils
 ```
 
 Skills are namespaced after install: `/airtable-utils:airtable-scripting`, `/airtable-utils:airtable-schema`, `/airtable-utils:airtable-schema-diff`, `/airtable-utils:airtable-user-scraping`.
+
+### Standalone (no Claude Code plugin needed)
+
+```bash
+git clone https://github.com/mickzijdel/airtable-utils
+cd airtable-utils
+# Run any script directly — uv handles dependencies automatically
+bin/airtable-export-schema --help
+```
