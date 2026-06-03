@@ -68,14 +68,15 @@ def format_schema_as_markdown(schema: dict[str, Any], base_id: str) -> str:
         
         # Fields
         lines.append("\n### Fields\n")
-        lines.append("| # | Field Name | Type | Description |")
-        lines.append("|---|------------|------|-------------|")
-        
+        lines.append("| # | Field Name | Field ID | Type | Description |")
+        lines.append("|---|------------|----------|------|-------------|")
+
         for i, field in enumerate(table.get("fields", []), 1):
             field_name = field.get("name", "")
+            field_id = field.get("id", "")
             field_type = field.get("type", "")
             field_desc = field.get("description", "").replace("\n", " ").replace("|", "\\|")
-            
+
             # Add options info for select fields
             options = field.get("options", {})
             if field_type in ("singleSelect", "multipleSelects") and "choices" in options:
@@ -86,8 +87,8 @@ def format_schema_as_markdown(schema: dict[str, Any], base_id: str) -> str:
             elif field_type == "multipleRecordLinks":
                 linked_table = options.get("linkedTableId", "")
                 field_desc += f" → Links to `{linked_table}`"
-            
-            lines.append(f"| {i} | {field_name} | {field_type} | {field_desc[:100]}{'...' if len(field_desc) > 100 else ''} |")
+
+            lines.append(f"| {i} | {field_name} | `{field_id}` | {field_type} | {field_desc[:100]}{'...' if len(field_desc) > 100 else ''} |")
         
         # Views
         views = table.get("views", [])
