@@ -93,7 +93,7 @@ def test_cli_prints_diff(tmp_path):
     old_file.write_text(json.dumps(SCHEMA_A))
     new_file.write_text(json.dumps(SCHEMA_B))
     result = subprocess.run(
-        ["python", str(Path(__file__).parent.parent / "bin" / "airtable-diff-schema"),
+        [sys.executable, str(Path(__file__).parent.parent / "bin" / "airtable-diff-schema"),
          str(old_file), str(new_file)],
         capture_output=True, text=True,
     )
