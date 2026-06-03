@@ -1,0 +1,216 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""
+Airtable Schema Diff
+
+Compares two Airtable schema JSON exports (from airtable-export-schema) and
+outputs a markdown diff showing what changed between them.
+
+Comparisons are by entity ID, so renames are detected correctly.
+
+Usage:
+    airtable-diff-schema old_schema.json new_schema.json
+    airtable-diff-schema old.json new.json --output diff.md
+"""
+
+import argparse
+import json
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Data structures
+# ---------------------------------------------------------------------------
+
+@dataclass
+class FieldChange:
+    field_id: str
+    field_name: str
+    old_type: str
+    new_type: str
+
+
+@dataclass
+class TableDiff:
+    table_id: str
+    table_name: str
+    old_name: str | None = None
+    added_fields: list[dict] = field(default_factory=list)
+    removed_fields: list[dict] = field(default_factory=list)
+    renamed_fields: list[tuple] = field(default_factory=list)   # (id, old_name, new_name)
+    changed_fields: list[FieldChange] = field(default_factory=list)
+    added_views: list[dict] = field(default_factory=list)
+    removed_views: list[dict] = field(default_factory=list)
+    renamed_views: list[tuple] = field(default_factory=list)    # (id, old_name, new_name)
+
+    def has_changes(self) -> bool:
+        return any([
+            self.old_name,
+            self.added_fields, self.removed_fields,
+            self.renamed_fields, self.changed_fields,
+            self.added_views, self.removed_views, self.renamed_views,
+        ])
+
+
+@dataclass
+class SchemaDiff:
+    added_tables: list[dict] = field(default_factory=list)
+    removed_tables: list[dict] = field(default_factory=list)
+    changed_tables: list[TableDiff] = field(default_factory=list)
+
+    def has_changes(self) -> bool:
+        return bool(self.added_tables or self.removed_tables or self.changed_tables)
+
+
+# ---------------------------------------------------------------------------
+# Diff logic
+# ---------------------------------------------------------------------------
+
+def diff_schemas(old: dict, new: dict) -> SchemaDiff:
+    old_tables = {t["id"]: t for t in old.get("tables", [])}
+    new_tables = {t["id"]: t for t in new.get("tables", [])}
+
+    added = [new_tables[i] for i in new_tables if i not in old_tables]
+    removed = [old_tables[i] for i in old_tables if i not in new_tables]
+    changed = []
+
+    for tid in old_tables:
+        if tid in new_tables:
+            td = _diff_table(old_tables[tid], new_tables[tid])
+            if td.has_changes():
+                changed.append(td)
+
+    return SchemaDiff(added_tables=added, removed_tables=removed, changed_tables=changed)
+
+
+def _diff_table(old: dict, new: dict) -> TableDiff:
+    td = TableDiff(table_id=old["id"], table_name=new["name"])
+    if old["name"] != new["name"]:
+        td.old_name = old["name"]
+
+    old_fields = {f["id"]: f for f in old.get("fields", [])}
+    new_fields = {f["id"]: f for f in new.get("fields", [])}
+    td.added_fields = [new_fields[i] for i in new_fields if i not in old_fields]
+    td.removed_fields = [old_fields[i] for i in old_fields if i not in new_fields]
+
+    for fid in old_fields:
+        if fid not in new_fields:
+            continue
+        of, nf = old_fields[fid], new_fields[fid]
+        if of["name"] != nf["name"]:
+            td.renamed_fields.append((fid, of["name"], nf["name"]))
+        if of["type"] != nf["type"]:
+            td.changed_fields.append(FieldChange(fid, nf["name"], of["type"], nf["type"]))
+
+    old_views = {v["id"]: v for v in old.get("views", [])}
+    new_views = {v["id"]: v for v in new.get("views", [])}
+    td.added_views = [new_views[i] for i in new_views if i not in old_views]
+    td.removed_views = [old_views[i] for i in old_views if i not in new_views]
+    for vid in old_views:
+        if vid in new_views and old_views[vid]["name"] != new_views[vid]["name"]:
+            td.renamed_views.append((vid, old_views[vid]["name"], new_views[vid]["name"]))
+
+    return td
+
+
+# ---------------------------------------------------------------------------
+# Output formatter
+# ---------------------------------------------------------------------------
+
+def format_diff_as_markdown(diff: SchemaDiff, old_label: str = "old", new_label: str = "new") -> str:
+    lines = [f"# Schema diff: {old_label} → {new_label}\n"]
+
+    if not diff.has_changes():
+        lines.append("_No changes detected._")
+        return "\n".join(lines)
+
+    if diff.added_tables:
+        lines.append("## Added tables")
+        for t in diff.added_tables:
+            lines.append(f"- **{t['name']}** (`{t['id']}`)")
+        lines.append("")
+
+    if diff.removed_tables:
+        lines.append("## Removed tables")
+        for t in diff.removed_tables:
+            lines.append(f"- **{t['name']}** (`{t['id']}`)")
+        lines.append("")
+
+    for td in diff.changed_tables:
+        lines.append(f"## Table: {td.table_name}")
+        if td.old_name:
+            lines.append(f"- Renamed: **{td.old_name}** → **{td.table_name}**")
+        if td.added_fields:
+            lines.append("### Added fields")
+            for f in td.added_fields:
+                lines.append(f"  - **{f['name']}** (`{f['type']}`)")
+        if td.removed_fields:
+            lines.append("### Removed fields")
+            for f in td.removed_fields:
+                lines.append(f"  - **{f['name']}** (`{f['type']}`)")
+        if td.renamed_fields:
+            lines.append("### Renamed fields")
+            for fid, old_name, new_name in td.renamed_fields:
+                lines.append(f"  - **{old_name}** → **{new_name}**")
+        if td.changed_fields:
+            lines.append("### Type changes")
+            for fc in td.changed_fields:
+                lines.append(f"  - **{fc.field_name}**: `{fc.old_type}` → `{fc.new_type}`")
+        if td.added_views:
+            lines.append("### Added views")
+            for v in td.added_views:
+                lines.append(f"  - {v['name']}")
+        if td.removed_views:
+            lines.append("### Removed views")
+            for v in td.removed_views:
+                lines.append(f"  - {v['name']}")
+        if td.renamed_views:
+            lines.append("### Renamed views")
+            for vid, old_name, new_name in td.renamed_views:
+                lines.append(f"  - **{old_name}** → **{new_name}**")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Diff two Airtable schema JSON exports")
+    parser.add_argument("old_schema", help="Path to the older schema JSON file")
+    parser.add_argument("new_schema", help="Path to the newer schema JSON file")
+    parser.add_argument("--output", "-o", help="Write diff to this file (default: stdout)")
+    args = parser.parse_args()
+
+    old_path = Path(args.old_schema)
+    new_path = Path(args.new_schema)
+
+    for p in (old_path, new_path):
+        if not p.exists():
+            print(f"Error: {p} not found", file=sys.stderr)
+            sys.exit(1)
+
+    old_schema = json.loads(old_path.read_text())
+    new_schema = json.loads(new_path.read_text())
+
+    diff = diff_schemas(old_schema, new_schema)
+    report = format_diff_as_markdown(diff, old_label=old_path.name, new_label=new_path.name)
+
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(report)
+        print(f"Diff written to {out}")
+    else:
+        print(report)
+
+
+if __name__ == "__main__":
+    main()
