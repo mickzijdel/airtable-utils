@@ -28,7 +28,26 @@ from typing import Optional
 from playwright.async_api import async_playwright, Page, BrowserContext
 
 
+def _load_dotenv(env_path: Path) -> None:
+    """Load key=value pairs from a .env file into os.environ (no-op if missing)."""
+    if not env_path.exists():
+        return
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+
+
 # Configuration
+_SCRIPT_DIR = Path(__file__).parent
+_load_dotenv(Path.cwd() / ".env")
+_load_dotenv(_SCRIPT_DIR / ".env")
+
 OUTPUT_DIR = Path("output")
 AUTH_STATE_FILE = OUTPUT_DIR / "airtable_auth_state.json"
 OUTPUT_FILE = OUTPUT_DIR / "airtable_users_export.json"
