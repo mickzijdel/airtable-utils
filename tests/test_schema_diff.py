@@ -87,6 +87,36 @@ def test_format_contains_table_name():
     assert "added" in md.lower()
 
 
+def test_detects_type_change():
+    schema_before = {
+        "tables": [{
+            "id": "tblX",
+            "name": "Thing",
+            "description": "",
+            "primaryFieldId": "fldX1",
+            "fields": [{"id": "fldX1", "name": "Score", "type": "singleLineText"}],
+            "views": [],
+        }]
+    }
+    schema_after = {
+        "tables": [{
+            "id": "tblX",
+            "name": "Thing",
+            "description": "",
+            "primaryFieldId": "fldX1",
+            "fields": [{"id": "fldX1", "name": "Score", "type": "number"}],
+            "views": [],
+        }]
+    }
+    diff = schema_diff.diff_schemas(schema_before, schema_after)
+    assert len(diff.changed_tables) == 1
+    td = diff.changed_tables[0]
+    assert len(td.changed_fields) == 1
+    assert td.changed_fields[0].field_name == "Score"
+    assert td.changed_fields[0].old_type == "singleLineText"
+    assert td.changed_fields[0].new_type == "number"
+
+
 def test_cli_prints_diff(tmp_path):
     old_file = tmp_path / "old.json"
     new_file = tmp_path / "new.json"

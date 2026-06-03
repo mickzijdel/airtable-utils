@@ -29,7 +29,6 @@ from pathlib import Path
 
 @dataclass
 class FieldChange:
-    field_id: str
     field_name: str
     old_type: str
     new_type: str
@@ -105,7 +104,7 @@ def _diff_table(old: dict, new: dict) -> TableDiff:
         if of["name"] != nf["name"]:
             td.renamed_fields.append((fid, of["name"], nf["name"]))
         if of["type"] != nf["type"]:
-            td.changed_fields.append(FieldChange(fid, nf["name"], of["type"], nf["type"]))
+            td.changed_fields.append(FieldChange(nf["name"], of["type"], nf["type"]))
 
     old_views = {v["id"]: v for v in old.get("views", [])}
     new_views = {v["id"]: v for v in new.get("views", [])}
