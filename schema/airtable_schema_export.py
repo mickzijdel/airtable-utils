@@ -8,6 +8,7 @@ Downloads the complete schema of an Airtable base including:
 
 Usage:
     python airtable_schema_export.py --token YOUR_TOKEN --base BASE_ID [--output schema.json]
+    AIRTABLE_TOKEN=YOUR_TOKEN AIRTABLE_BASE_ID=BASE_ID python airtable_schema_export.py
 
 Requirements:
     pip install requests
@@ -15,6 +16,7 @@ Requirements:
 
 import argparse
 import json
+import os
 import requests
 from datetime import datetime
 from typing import Any
@@ -130,13 +132,13 @@ def main():
     )
     parser.add_argument(
         "--token", "-t",
-        required=True,
-        help="Airtable Personal Access Token"
+        default=os.environ.get("AIRTABLE_TOKEN"),
+        help="Airtable Personal Access Token (or set AIRTABLE_TOKEN env var)"
     )
     parser.add_argument(
         "--base", "-b",
-        required=True,
-        help="Base ID (starts with 'app')"
+        default=os.environ.get("AIRTABLE_BASE_ID"),
+        help="Base ID (starts with 'app') (or set AIRTABLE_BASE_ID env var)"
     )
     parser.add_argument(
         "--output", "-o",
@@ -151,7 +153,12 @@ def main():
     )
     
     args = parser.parse_args()
-    
+
+    if not args.token:
+        parser.error("--token is required (or set AIRTABLE_TOKEN env var)")
+    if not args.base:
+        parser.error("--base is required (or set AIRTABLE_BASE_ID env var)")
+
     print(f"Fetching schema for base: {args.base}")
     base_name = get_base_info(args.token, args.base)
     print(f"Base name: {base_name}")
