@@ -63,14 +63,14 @@ AIRTABLE_BASE_ID=appXXXXXXXX       # optional, for airtable-export-schema
 The repo serves as its own marketplace. Add it once, then install the plugin:
 
 ```
-/plugin marketplace add mickzijdel/airtable_utils
+/plugin marketplace add mickzijdel/airtable-utils
 /plugin install airtable-utils@airtable-utils
 ```
 
 For local testing without installing:
 
 ```bash
-claude --plugin-dir /path/to/airtable_utils
+claude --plugin-dir /path/to/airtable-utils
 ```
 
 Skills are namespaced after install: `/airtable-utils:airtable-scripting`, `/airtable-utils:airtable-schema`, `/airtable-utils:airtable-user-scraping`.

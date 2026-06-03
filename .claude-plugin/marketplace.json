@@ -15,7 +15,7 @@
       "description": "Skills and utilities for working with Airtable: schema export, scripting guidance, and collaborator access scraping.",
       "source": {
         "source": "github",
-        "repo": "mickzijdel/airtable_utils",
+        "repo": "mickzijdel/airtable-utils",
         "ref": "main"
       },
       "category": "productivity",
@@ -25,7 +25,7 @@
         "email": "claude@mickzijdel.com",
         "url": "https://github.com/mickzijdel"
       },
-      "homepage": "https://github.com/mickzijdel/airtable_utils",
+      "homepage": "https://github.com/mickzijdel/airtable-utils",
       "keywords": ["airtable", "schema", "scripting", "automation"]
     }
   ]

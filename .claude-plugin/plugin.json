@@ -8,8 +8,8 @@
     "email": "claude@mickzijdel.com",
     "url": "https://github.com/mickzijdel"
   },
-  "homepage": "https://github.com/mickzijdel/airtable_utils",
-  "repository": "https://github.com/mickzijdel/airtable_utils",
+  "homepage": "https://github.com/mickzijdel/airtable-utils",
+  "repository": "https://github.com/mickzijdel/airtable-utils",
   "license": "MIT",
   "keywords": ["airtable", "scripting", "schema", "users"],
   "skills": "skills/"
