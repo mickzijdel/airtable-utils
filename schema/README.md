@@ -17,12 +17,20 @@ python airtable_schema_export.py --token YOUR_TOKEN --base BASE_ID
 # Using environment variables
 AIRTABLE_TOKEN=YOUR_TOKEN AIRTABLE_BASE_ID=appXXXXXXXX python airtable_schema_export.py
 
+# Using a .env file (recommended — loaded automatically from cwd or script dir)
+# .env:
+#   AIRTABLE_TOKEN=patXXXXXXXXXX
+#   AIRTABLE_BASE_ID=appXXXXXXXX
+python airtable_schema_export.py
+
 # Options
 python airtable_schema_export.py \
   --token YOUR_TOKEN \
   --base BASE_ID \
   --format json        # json | markdown | both (default: both)
 ```
+
+**Per-folder credentials:** the script loads `.env` from the current working directory first, then from the script's own directory. Place a `.env` in each project folder to keep credentials separate per base.
 
 Output files are named `{base_id}_{base_name}_{timestamp}_schema.json/.md` and written to the current directory.
 

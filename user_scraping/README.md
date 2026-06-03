@@ -21,12 +21,24 @@ playwright install chromium
 python airtable_user_scraper.py --login
 
 # 2. Scrape all bases and save workspace config
+#    Set AIRTABLE_API_KEY via export, inline env, or a .env file (see below)
 export AIRTABLE_API_KEY=pat...
 python airtable_user_scraper.py --from-api --save-config
 
 # 3. Future runs (uses saved config, shows changes)
 python airtable_user_scraper.py
 ```
+
+### Using a .env file (recommended)
+
+Place a `.env` in the directory you run the script from — it is loaded automatically, no extra packages needed:
+
+```dotenv
+# .env
+AIRTABLE_API_KEY=patXXXXXXXXXX
+```
+
+**Per-folder credentials:** the script loads `.env` from the current working directory first, so you can keep a separate `.env` per project folder to switch between accounts without changing environment variables.
 
 ## Workspace-Based Workflow
 

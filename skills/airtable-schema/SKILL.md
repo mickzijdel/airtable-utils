@@ -57,6 +57,24 @@ python schema/airtable_schema_export.py \
   --format json        # json | markdown | both
 ```
 
+## Using a .env File (Recommended)
+
+Instead of passing flags or exporting shell variables, place a `.env` file in the directory where you run the script (or next to the script itself). The script loads it automatically, no extra packages needed.
+
+```dotenv
+# .env
+AIRTABLE_TOKEN=patXXXXXXXXXX
+AIRTABLE_BASE_ID=appXXXXXXXXXX
+```
+
+Then just run:
+
+```bash
+python schema/airtable_schema_export.py
+```
+
+**Per-folder credentials:** Because the script looks for `.env` in the *current working directory* first, you can keep a separate `.env` per project folder, each pointing at a different base or token. Run the script from that folder and it picks up the right credentials automatically.
+
 Output files are written to the current directory, named:
 ```
 {base_id}_{base_name}_{timestamp}_schema.json

@@ -43,6 +43,15 @@ export AIRTABLE_API_KEY=patXXXXXXXXXX
 python user_scraping/airtable_user_scraper.py --from-api --save-config
 ```
 
+**Tip:** Instead of exporting the variable, place a `.env` file in the directory you run the script from (or next to the script). It is loaded automatically, no extra packages needed.
+
+```dotenv
+# .env
+AIRTABLE_API_KEY=patXXXXXXXXXX
+```
+
+Because the script looks for `.env` in the *current working directory* first, you can keep separate `.env` files per project folder to switch between Airtable accounts without touching environment variables.
+
 ### Step 3: Scrape user data
 
 Uses the saved config. Shows changes compared to the previous run.
