@@ -78,6 +78,7 @@ Output files are written to the current directory, named:
 {base_id}_{base_name}_{timestamp}_schema.json
 {base_id}_{base_name}_{timestamp}_schema.md
 ```
+The `{timestamp}` is `YYYY-MM-DD_HH-MM-SS` (down to the second). If a file with the same name already exists, a `_1`, `_2`, … counter is appended, so an export never overwrites a previous one.
 
 ## Output Format
 

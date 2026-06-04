@@ -194,11 +194,26 @@ def main():
     num_views = sum(len(t.get("views", [])) for t in schema.get("tables", []))
     print(f"Found {num_tables} tables, {num_fields} fields, {num_views} views")
 
-    # Build output filename stem from date, time, base name and app ID
+    # Build output filename stem from date, time, base name and app ID.
+    # Seconds keep two exports in the same minute apart; a counter is appended
+    # if a file with the same stem somehow already exists (e.g. two exports
+    # within the same second) so an export never overwrites a previous one.
     now = datetime.now()
-    timestamp = now.strftime("%Y-%m-%d_%H-%M")
+    timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
     safe_base_name = base_name.replace(" ", "_").replace("/", "-")
-    file_stem = f"{args.base}_{safe_base_name}_{timestamp}_schema"
+    base_stem = f"{args.base}_{safe_base_name}_{timestamp}_schema"
+
+    extensions = []
+    if args.format in ("json", "both"):
+        extensions.append(".json")
+    if args.format in ("markdown", "both"):
+        extensions.append(".md")
+
+    file_stem = base_stem
+    counter = 1
+    while any(os.path.exists(f"{file_stem}{ext}") for ext in extensions):
+        file_stem = f"{base_stem}_{counter}"
+        counter += 1
 
     if args.format in ("json", "both"):
         json_file = f"{file_stem}.json"
