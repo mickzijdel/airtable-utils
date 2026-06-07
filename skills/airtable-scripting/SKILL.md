@@ -15,11 +15,13 @@ This skill provides comprehensive guidance for writing Airtable scripts in both 
 
 ## Direct Airtable Access via MCP
 
-If the user asks Claude to **directly read or modify Airtable data** (rather than write a script for them to run), use the official Airtable MCP plugin instead of this skill:
+If the user asks Claude to **directly read or modify Airtable data** (rather than write a script for them to run), use an Airtable MCP server instead of this skill:
 
 ```
 /plugin install airtable@claude-plugins-official
 ```
+
+Alternatively, the community [`airtable-mcp-server`](https://github.com/domdomegg/airtable-mcp-server) by domdomegg offers the same read/write + schema capabilities and can be run via `npx` or Docker.
 
 This skill is for **authoring scripts** that users will paste into Airtable's Scripting Extension or Automation editor.
 
@@ -421,8 +423,14 @@ console.log(data.records.map(r => r.id));
 ### Scripting API Format
 
 ```javascript
-// Text
+// Text (singleLineText)
 {"fldTEXTXXXXXX": "Hello World"}
+
+// Long text (multilineText) — plain string
+{"fldLTXTXXXXXX": "Line one\nLine two"}
+
+// Rich text (richText) — plain string on write; stored/returned as Markdown
+{"fldRTXTXXXXXX": "**Bold** and _italic_"}
 
 // Number
 {"fldNUMXXXXXXX": 42}
@@ -453,8 +461,14 @@ console.log(data.records.map(r => r.id));
     }
 ]}
 
-// User
+// User (singleCollaborator)
 {"fldUSRXXXXXXX": {id: "usrXXXXXXXXXX"}}
+
+// Multiple Collaborators (array of users)
+{"fldUSRSXXXXXX": [{id: "usrXXXXXXXXXX"}, {id: "usrYYYYYYYYYY"}]}
+
+// Barcode (object: text is required, type is optional)
+{"fldBARXXXXXXX": {text: "012345678905", type: "code128"}}
 
 // Email
 {"fldEMLXXXXXXX": "user@example.com"}
@@ -502,6 +516,15 @@ console.log(data.records.map(r => r.id));
 // Cannot be set via API
 
 // Last Modified By (read-only)
+// Cannot be set via API
+
+// Auto Number (read-only)
+// Cannot be set via API
+
+// AI Text (read-only) — value is AI-generated from a prompt
+// Cannot be set via API
+
+// External Sync Source (read-only) — synced single-select-like value
 // Cannot be set via API
 ```
 

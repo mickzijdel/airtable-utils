@@ -11,11 +11,13 @@ This skill covers running `airtable-export-schema` to dump an Airtable base's fu
 
 ## Direct Airtable Access via MCP
 
-If the user wants Claude to **directly read or modify Airtable data**, use the official Airtable MCP plugin instead:
+If the user wants Claude to **directly read or modify Airtable data**, use an Airtable MCP server instead:
 
 ```
 /plugin install airtable@claude-plugins-official
 ```
+
+The community [`airtable-mcp-server`](https://github.com/domdomegg/airtable-mcp-server) by domdomegg is an alternative (run via `npx` or Docker).
 
 This skill is for exporting schema metadata to a local file.
 
@@ -102,7 +104,7 @@ The `{timestamp}` is `YYYY-MM-DD_HH-MM-SS` (down to the second). If a file with 
 }
 ```
 
-**Markdown** — human-readable summary of the schema.
+**Markdown** — human-readable summary of the schema. Each table renders a fields table with columns `# | Field Name | Field ID | Type | Options | Description`. The **Options** column summarises each field's configuration (number/currency precision, date/time format, select choices, rating max, linked-table ID with reversed/single flags, rollup/lookup/count source fields and result type, etc.). Nothing is truncated — descriptions and choice lists are shown in full.
 
 ## Workflow: Schema Before Scripting
 

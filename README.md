@@ -14,7 +14,7 @@ Use this skill when writing scripts for the user to paste into Airtable.
 
 > **Standalone use:** You can use this skill without installing the plugin. Copy [`skills/airtable-scripting.md`](skills/airtable-scripting.md) and load it manually in any Claude Code session.
 
-> For Claude to **directly read or write Airtable data**, use the official [`airtable@claude-plugins-official`](https://www.airtable.com) plugin instead, which bundles the official MCP server.
+> For Claude to **directly read or write Airtable data**, use the official [`airtable@claude-plugins-official`](https://www.airtable.com) plugin instead, which bundles the official MCP server. The community [`airtable-mcp-server`](https://github.com/domdomegg/airtable-mcp-server) by domdomegg is an alternative (run via `npx` or Docker) offering the same read/write + schema tools.
 
 ### `airtable-schema`
 Runs `airtable-export-schema` to dump a base's full schema (tables, fields, views) to JSON and Markdown. Use this before writing scripts so you have accurate IDs.
@@ -38,7 +38,7 @@ When installed as a plugin, Claude can call these scripts directly. For terminal
 
 ### `airtable-export-schema`
 
-Exports a base's schema via the Airtable API. Writes `{base_id}_{name}_{timestamp}_schema.json/.md` to the current directory.
+Exports a base's schema via the Airtable API. Writes `{base_id}_{name}_{timestamp}_schema.json/.md` to the current directory. The Markdown output includes an **Options** column summarising each field's configuration (precision, date/time format, select choices, linked tables, rollup/lookup sources, etc.), shown in full without truncation.
 
 **Dependencies:** `requests` (installed automatically by uv)
 

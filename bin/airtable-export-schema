@@ -82,6 +82,130 @@ def get_base_schema(token: str, base_id: str) -> dict[str, Any]:
     return response.json()
 
 
+def _md_cell(text: str) -> str:
+    """Make a string safe for a single Markdown table cell (no row/column breaks)."""
+    return text.replace("\n", " ").replace("\r", " ").replace("|", "\\|").strip()
+
+
+def _summarize_field_options(field_type: str, options: dict[str, Any]) -> str:
+    """
+    Return a short, human-readable summary of a field's `options`.
+
+    Covers the option-bearing Airtable field types. Returns "" for types that
+    carry no meaningful config. Never truncates — the full schema is in the JSON
+    export, and the Markdown is meant to be complete too.
+    """
+    if not options:
+        return ""
+
+    def _result_type() -> str:
+        result = options.get("result") or {}
+        rtype = result.get("type")
+        return f"result: {rtype}" if rtype else ""
+
+    if field_type in ("number", "percent"):
+        precision = options.get("precision")
+        return f"precision: {precision}" if precision is not None else ""
+
+    if field_type == "currency":
+        parts = []
+        if options.get("symbol"):
+            parts.append(str(options["symbol"]))
+        if options.get("precision") is not None:
+            parts.append(f"precision: {options['precision']}")
+        return " · ".join(parts)
+
+    if field_type == "date":
+        name = (options.get("dateFormat") or {}).get("name")
+        return name or ""
+
+    if field_type in ("dateTime", "createdTime", "lastModifiedTime"):
+        parts = []
+        date_name = (options.get("dateFormat") or {}).get("name")
+        time_name = (options.get("timeFormat") or {}).get("name")
+        if date_name:
+            parts.append(date_name)
+        if time_name:
+            parts.append(time_name)
+        if options.get("timeZone"):
+            parts.append(str(options["timeZone"]))
+        if field_type != "dateTime":
+            # createdTime / lastModifiedTime wrap their format in `result`
+            result_fmt = options.get("result") or {}
+            for sub in (result_fmt.get("options") or {},):
+                dn = (sub.get("dateFormat") or {}).get("name")
+                tn = (sub.get("timeFormat") or {}).get("name")
+                if dn and dn not in parts:
+                    parts.append(dn)
+                if tn and tn not in parts:
+                    parts.append(tn)
+        return " · ".join(parts)
+
+    if field_type == "duration":
+        return str(options.get("durationFormat") or "")
+
+    if field_type == "rating":
+        parts = []
+        if options.get("max") is not None:
+            parts.append(f"max {options['max']}")
+        if options.get("icon"):
+            parts.append(str(options["icon"]))
+        return " · ".join(parts)
+
+    if field_type == "checkbox":
+        parts = []
+        if options.get("icon"):
+            parts.append(str(options["icon"]))
+        if options.get("color"):
+            parts.append(str(options["color"]))
+        return " · ".join(parts)
+
+    if field_type in ("singleSelect", "multipleSelects", "externalSyncSource"):
+        choices = options.get("choices") or []
+        names = [c.get("name", "") for c in choices]
+        return f"Choices: {', '.join(names)}" if names else ""
+
+    if field_type == "multipleRecordLinks":
+        linked = options.get("linkedTableId", "")
+        summary = f"→ `{linked}`" if linked else ""
+        flags = []
+        if options.get("isReversed"):
+            flags.append("reversed")
+        if options.get("prefersSingleRecordLink"):
+            flags.append("single")
+        if flags:
+            summary = f"{summary} ({', '.join(flags)})".strip()
+        return summary
+
+    if field_type == "multipleAttachments":
+        return "(reversed)" if options.get("isReversed") else ""
+
+    if field_type == "count":
+        link = options.get("recordLinkFieldId")
+        return f"via `{link}`" if link else ""
+
+    if field_type in ("rollup", "lookup", "multipleLookupValues"):
+        parts = []
+        link = options.get("recordLinkFieldId")
+        linked_field = options.get("fieldIdInLinkedTable")
+        if link and linked_field:
+            parts.append(f"via `{link}` → `{linked_field}`")
+        elif link:
+            parts.append(f"via `{link}`")
+        rt = _result_type()
+        if rt:
+            parts.append(rt)
+        return " · ".join(parts)
+
+    if field_type == "formula":
+        return _result_type()
+
+    if field_type == "aiText":
+        return "AI generated"
+
+    return ""
+
+
 def format_schema_as_markdown(schema: dict[str, Any], base_id: str, base_name: str) -> str:
     """
     Convert the schema to a readable markdown format.
@@ -114,27 +238,21 @@ def format_schema_as_markdown(schema: dict[str, Any], base_id: str, base_name: s
 
         # Fields
         lines.append("\n### Fields\n")
-        lines.append("| # | Field Name | Field ID | Type | Description |")
-        lines.append("|---|------------|----------|------|-------------|")
+        lines.append("| # | Field Name | Field ID | Type | Options | Description |")
+        lines.append("|---|------------|----------|------|---------|-------------|")
 
         for i, field in enumerate(table.get("fields", []), 1):
             field_name = field.get("name", "")
             field_id = field.get("id", "")
             field_type = field.get("type", "")
-            field_desc = field.get("description", "").replace("\n", " ").replace("|", "\\|")
+            field_desc = _md_cell(field.get("description") or "")
+            options_summary = _md_cell(
+                _summarize_field_options(field_type, field.get("options") or {})
+            )
 
-            # Add options info for select fields
-            options = field.get("options", {})
-            if field_type in ("singleSelect", "multipleSelects") and "choices" in options:
-                choices = [c.get("name", "") for c in options["choices"][:5]]
-                if len(options["choices"]) > 5:
-                    choices.append(f"... +{len(options['choices']) - 5} more")
-                field_desc += f" Choices: {', '.join(choices)}"
-            elif field_type == "multipleRecordLinks":
-                linked_table = options.get("linkedTableId", "")
-                field_desc += f" → Links to `{linked_table}`"
-
-            lines.append(f"| {i} | {field_name} | `{field_id}` | {field_type} | {field_desc[:100]}{'...' if len(field_desc) > 100 else ''} |")
+            lines.append(
+                f"| {i} | {field_name} | `{field_id}` | {field_type} | {options_summary} | {field_desc} |"
+            )
 
         # Views
         views = table.get("views", [])
