@@ -82,6 +82,17 @@ def get_base_schema(token: str, base_id: str) -> dict[str, Any]:
     return response.json()
 
 
+def build_output(schema: dict[str, Any], base_id: str, base_name: str) -> dict[str, Any]:
+    """
+    Wrap the raw Airtable schema with base identity for the JSON export.
+
+    The Airtable metadata API returns only `{"tables": [...]}`; we prepend a
+    `base` object so the exported JSON records which base it came from. Downstream
+    tools (diff, standards check) only read `tables`, so the extra key is safe.
+    """
+    return {"base": {"id": base_id, "name": base_name}, **schema}
+
+
 def _md_cell(text: str) -> str:
     """Make a string safe for a single Markdown table cell (no row/column breaks)."""
     return text.replace("\n", " ").replace("\r", " ").replace("|", "\\|").strip()
@@ -336,7 +347,7 @@ def main():
     if args.format in ("json", "both"):
         json_file = f"{file_stem}.json"
         with open(json_file, "w") as f:
-            json.dump(schema, f, indent=2)
+            json.dump(build_output(schema, args.base, base_name), f, indent=2)
         print(f"JSON schema saved to: {json_file}")
 
     if args.format in ("markdown", "both"):

@@ -7,6 +7,26 @@ from conftest import load_bin_script
 export_schema = load_bin_script("airtable-export-schema")
 summarize = export_schema._summarize_field_options
 render = export_schema.format_schema_as_markdown
+build_output = export_schema.build_output
+
+
+# ---------------------------------------------------------------------------
+# build_output (JSON wrapper carrying base identity)
+# ---------------------------------------------------------------------------
+
+def test_build_output_adds_base_identity():
+    schema = {"tables": [{"id": "tblA", "name": "Applicant"}]}
+    out = build_output(schema, "appXXX", "My Base")
+    assert out["base"] == {"id": "appXXX", "name": "My Base"}
+    # tables preserved, base listed first
+    assert out["tables"] == schema["tables"]
+    assert list(out.keys())[0] == "base"
+
+
+def test_build_output_does_not_mutate_input():
+    schema = {"tables": []}
+    build_output(schema, "appXXX", "My Base")
+    assert "base" not in schema
 
 
 # ---------------------------------------------------------------------------
