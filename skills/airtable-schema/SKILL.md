@@ -92,6 +92,14 @@ The `{timestamp}` is `YYYY-MM-DD_HH-MM-SS` (down to the second). If a file with 
 ```json
 {
   "base": { "id": "appXXX", "name": "My Base" },
+  "summary": {
+    "tableCount": 1,
+    "fieldCount": 2,
+    "viewCount": 1,
+    "tables": [
+      { "id": "tblXXX", "name": "Tasks", "primaryFieldName": "Name", "fieldCount": 2, "viewCount": 1 }
+    ]
+  },
   "tables": [
     {
       "id": "tblXXX",
@@ -108,7 +116,9 @@ The `{timestamp}` is `YYYY-MM-DD_HH-MM-SS` (down to the second). If a file with 
 }
 ```
 
-**Markdown** — human-readable summary of the schema. Each table renders a fields table with columns `# | Field Name | Field ID | Type | Options | Description`. The **Options** column summarises each field's configuration (number/currency precision, date/time format, select choices, rating max, linked-table ID with reversed/single flags, rollup/lookup/count source fields and result type, etc.). Nothing is truncated — descriptions and choice lists are shown in full.
+The `summary` object gives per-table stats (field count, view count, and resolved primary field name) plus base-wide totals — all derived from the schema, so no extra API calls or token scopes are needed. The raw `tables` array is unchanged, so downstream tools (diff, standards check) are unaffected.
+
+**Markdown** — human-readable summary of the schema. The header shows base-wide totals (`Tables · Fields · Views`), and each table lists its primary field plus field/view counts before the fields table. The fields table has columns `# | Field Name | Field ID | Type | Options | Description`. The **Options** column summarises each field's configuration (number/currency precision, date/time format, select choices, rating max, linked-table ID with reversed/single flags, rollup/lookup/count source fields and result type, etc.). Nothing is truncated — descriptions and choice lists are shown in full.
 
 ## Workflow: Schema Before Scripting
 

@@ -43,7 +43,7 @@ When installed as a plugin, Claude can call these scripts directly. For terminal
 
 ### `airtable-export-schema`
 
-Exports a base's schema via the Airtable API. Writes `{base_id}_{name}_{timestamp}_schema.json/.md` to the current directory. The Markdown output includes an **Options** column summarising each field's configuration (precision, date/time format, select choices, linked tables, rollup/lookup sources, etc.), shown in full without truncation.
+Exports a base's schema via the Airtable API. Writes `{base_id}_{name}_{timestamp}_schema.json/.md` to the current directory. Both outputs include per-table stats (field count, view count, and primary field name) plus base-wide totals, all derived from the schema with no extra API calls — the JSON carries them in a `summary` object and the Markdown shows them in the header and per-table headings. The Markdown output also includes an **Options** column summarising each field's configuration (precision, date/time format, select choices, linked tables, rollup/lookup sources, etc.), shown in full without truncation.
 
 **Dependencies:** `requests` (installed automatically by uv)
 

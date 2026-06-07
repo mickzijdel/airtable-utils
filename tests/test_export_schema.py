@@ -8,6 +8,8 @@ export_schema = load_bin_script("airtable-export-schema")
 summarize = export_schema._summarize_field_options
 render = export_schema.format_schema_as_markdown
 build_output = export_schema.build_output
+primary_field_name = export_schema._primary_field_name
+build_summary = export_schema._build_summary
 
 
 # ---------------------------------------------------------------------------
@@ -27,6 +29,100 @@ def test_build_output_does_not_mutate_input():
     schema = {"tables": []}
     build_output(schema, "appXXX", "My Base")
     assert "base" not in schema
+    assert "summary" not in schema
+
+
+def test_build_output_includes_summary():
+    schema = {
+        "tables": [
+            {
+                "id": "tblA",
+                "name": "Applicant",
+                "primaryFieldId": "fld2",
+                "fields": [
+                    {"id": "fld1", "name": "Score"},
+                    {"id": "fld2", "name": "Name"},
+                ],
+                "views": [{"id": "viw1", "name": "All"}],
+            }
+        ]
+    }
+    out = build_output(schema, "appXXX", "My Base")
+    # base stays first, tables preserved untouched
+    assert list(out.keys())[0] == "base"
+    assert out["tables"] == schema["tables"]
+    # summary present and correct
+    assert out["summary"]["tableCount"] == 1
+    assert out["summary"]["fieldCount"] == 2
+    assert out["summary"]["viewCount"] == 1
+    assert out["summary"]["tables"][0] == {
+        "id": "tblA",
+        "name": "Applicant",
+        "primaryFieldName": "Name",
+        "fieldCount": 2,
+        "viewCount": 1,
+    }
+
+
+# ---------------------------------------------------------------------------
+# _primary_field_name
+# ---------------------------------------------------------------------------
+
+def test_primary_field_name_resolves_non_first_field():
+    table = {
+        "primaryFieldId": "fld3",
+        "fields": [
+            {"id": "fld1", "name": "First"},
+            {"id": "fld2", "name": "Second"},
+            {"id": "fld3", "name": "Third"},
+        ],
+    }
+    assert primary_field_name(table) == "Third"
+
+
+def test_primary_field_name_falls_back_to_first_field():
+    table = {"fields": [{"id": "fld1", "name": "First"}, {"id": "fld2", "name": "Second"}]}
+    assert primary_field_name(table) == "First"
+    # unmatched id also falls back to first
+    table_bad = {"primaryFieldId": "nope", "fields": table["fields"]}
+    assert primary_field_name(table_bad) == "First"
+
+
+def test_primary_field_name_empty_fields():
+    assert primary_field_name({"fields": []}) == ""
+    assert primary_field_name({}) == ""
+
+
+# ---------------------------------------------------------------------------
+# _build_summary
+# ---------------------------------------------------------------------------
+
+def test_build_summary_totals_and_per_table():
+    schema = {
+        "tables": [
+            {
+                "id": "tblA",
+                "name": "Applicant",
+                "primaryFieldId": "fld1",
+                "fields": [{"id": "fld1", "name": "Name"}, {"id": "fld2", "name": "Age"}],
+                "views": [{"id": "v1", "name": "Grid"}, {"id": "v2", "name": "Form"}],
+            },
+            {
+                "id": "tblB",
+                "name": "Cohort",
+                "primaryFieldId": "fldX",
+                "fields": [{"id": "fldX", "name": "Title"}],
+                "views": [{"id": "v3", "name": "Grid"}],
+            },
+        ]
+    }
+    summary = build_summary(schema)
+    assert summary["tableCount"] == 2
+    assert summary["fieldCount"] == 3
+    assert summary["viewCount"] == 3
+    assert [t["name"] for t in summary["tables"]] == ["Applicant", "Cohort"]
+    assert summary["tables"][0]["primaryFieldName"] == "Name"
+    assert summary["tables"][1]["primaryFieldName"] == "Title"
 
 
 # ---------------------------------------------------------------------------
@@ -154,3 +250,15 @@ def test_markdown_does_not_truncate():
     assert LONG_DESC in md
     assert "..." not in md
     assert "more" not in md
+
+
+def test_markdown_header_has_totals():
+    md = render(SCHEMA, "appXXX", "Test Base")
+    # one table, seven fields, one view
+    assert "**Tables:** 1 · **Fields:** 7 · **Views:** 1" in md
+
+
+def test_markdown_per_table_stats_line():
+    md = render(SCHEMA, "appXXX", "Test Base")
+    # primaryFieldId absent -> falls back to first field "Score"
+    assert "**Primary field:** Score · **Fields:** 7 · **Views:** 1" in md

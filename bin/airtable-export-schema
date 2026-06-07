@@ -82,15 +82,66 @@ def get_base_schema(token: str, base_id: str) -> dict[str, Any]:
     return response.json()
 
 
+def _primary_field_name(table: dict[str, Any]) -> str:
+    """
+    Resolve a table's primary field name from its primaryFieldId.
+
+    The metadata API reports `primaryFieldId` on every table; we match it against
+    the field list. Falls back to the first field if the id is missing or unmatched,
+    and to "" if the table has no fields.
+    """
+    fields = table.get("fields", [])
+    primary_id = table.get("primaryFieldId")
+    if primary_id:
+        for field in fields:
+            if field.get("id") == primary_id:
+                return field.get("name", "")
+    return fields[0].get("name", "") if fields else ""
+
+
+def _build_summary(schema: dict[str, Any]) -> dict[str, Any]:
+    """
+    Build a per-table stats summary from the schema (no extra API calls).
+
+    All values are derived from the metadata the schema already carries: field and
+    view counts come from the array lengths, and the primary field name is resolved
+    from `primaryFieldId`.
+    """
+    tables = schema.get("tables", [])
+    table_summaries = [
+        {
+            "id": table.get("id", ""),
+            "name": table.get("name", ""),
+            "primaryFieldName": _primary_field_name(table),
+            "fieldCount": len(table.get("fields", [])),
+            "viewCount": len(table.get("views", [])),
+        }
+        for table in tables
+    ]
+    return {
+        "tableCount": len(tables),
+        "fieldCount": sum(t["fieldCount"] for t in table_summaries),
+        "viewCount": sum(t["viewCount"] for t in table_summaries),
+        "tables": table_summaries,
+    }
+
+
 def build_output(schema: dict[str, Any], base_id: str, base_name: str) -> dict[str, Any]:
     """
     Wrap the raw Airtable schema with base identity for the JSON export.
 
     The Airtable metadata API returns only `{"tables": [...]}`; we prepend a
-    `base` object so the exported JSON records which base it came from. Downstream
-    tools (diff, standards check) only read `tables`, so the extra key is safe.
+    `base` object so the exported JSON records which base it came from, and a
+    `summary` object with per-table stats (field/view counts, primary field) so the
+    counts are readable without re-deriving them. The raw `tables` array is left
+    untouched, so downstream tools (diff, standards check) that only read `tables`
+    are unaffected.
     """
-    return {"base": {"id": base_id, "name": base_name}, **schema}
+    return {
+        "base": {"id": base_id, "name": base_name},
+        "summary": _build_summary(schema),
+        **schema,
+    }
 
 
 def _md_cell(text: str) -> str:
@@ -234,14 +285,27 @@ def format_schema_as_markdown(schema: dict[str, Any], base_id: str, base_name: s
     lines = [f"# Airtable Base Schema: {base_name} (`{base_id}`) — {timestamp}\n"]
     lines.append(f"**Base:** {base_name}  ")
     lines.append(f"**App ID:** `{base_id}`  ")
-    lines.append(f"**Exported:** {timestamp}\n")
+    lines.append(f"**Exported:** {timestamp}  ")
 
-    for table in schema.get("tables", []):
+    tables = schema.get("tables", [])
+    total_fields = sum(len(t.get("fields", [])) for t in tables)
+    total_views = sum(len(t.get("views", [])) for t in tables)
+    lines.append(
+        f"**Tables:** {len(tables)} · **Fields:** {total_fields} · "
+        f"**Views:** {total_views}\n"
+    )
+
+    for table in tables:
         table_name = table.get("name", "Unnamed Table")
         table_id = table.get("id", "")
 
         lines.append(f"\n## Table: {table_name}")
         lines.append(f"**ID:** `{table_id}`")
+        lines.append(
+            f"**Primary field:** {_md_cell(_primary_field_name(table))} · "
+            f"**Fields:** {len(table.get('fields', []))} · "
+            f"**Views:** {len(table.get('views', []))}"
+        )
 
         # Description if present
         if table.get("description"):
