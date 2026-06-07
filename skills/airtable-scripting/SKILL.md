@@ -21,7 +21,11 @@ If the user asks Claude to **directly read or modify Airtable data** (rather tha
 /plugin install airtable@claude-plugins-official
 ```
 
-Alternatively, the community [`airtable-mcp-server`](https://github.com/domdomegg/airtable-mcp-server) by domdomegg offers the same read/write + schema capabilities and can be run via `npx` or Docker.
+The official plugin bundles Airtable's hosted MCP server (OAuth or PAT, nothing to run locally) and is the only one that can read **Interface pages** and **create whole bases**.
+
+Alternatively, the community [`airtable-mcp-server`](https://github.com/domdomegg/airtable-mcp-server) by domdomegg is a self-hosted option (run via `npx` or its HTTP transport, PAT auth only) and is the one that can **delete records** and work with **record comments**. Its HTTP transport has no built-in auth, so only run it behind a reverse proxy or in a secured environment.
+
+Both cover read/search/create/update of records and create/update of tables and fields.
 
 This skill is for **authoring scripts** that users will paste into Airtable's Scripting Extension or Automation editor.
 

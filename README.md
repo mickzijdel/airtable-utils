@@ -14,7 +14,12 @@ Use this skill when writing scripts for the user to paste into Airtable.
 
 > **Standalone use:** You can use this skill without installing the plugin. Copy [`skills/airtable-scripting.md`](skills/airtable-scripting.md) and load it manually in any Claude Code session.
 
-> For Claude to **directly read or write Airtable data**, use the official [`airtable@claude-plugins-official`](https://www.airtable.com) plugin instead, which bundles the official MCP server. The community [`airtable-mcp-server`](https://github.com/domdomegg/airtable-mcp-server) by domdomegg is an alternative (run via `npx` or Docker) offering the same read/write + schema tools.
+> For Claude to **directly read or write Airtable data**, use an MCP server. There are two main options:
+>
+> - **Official** — the [`airtable@claude-plugins-official`](https://www.airtable.com) plugin bundles Airtable's hosted MCP server (`https://mcp.airtable.com/mcp`). It uses OAuth (or a PAT), needs nothing to run locally, and is the only one that can read **Interface pages** and **create whole bases**. It also ships official agent skills. Record creation is capped at 10 per request.
+> - **Community** — [`airtable-mcp-server`](https://github.com/domdomegg/airtable-mcp-server) by domdomegg is self-hosted (run via `npx` or its HTTP transport), authenticates with a PAT only, and is the option that can **delete records** and work with **record comments**. Note its HTTP transport has no built-in auth, so only run it behind a reverse proxy or in a secured environment.
+>
+> Both cover the common ground: read/search records, create/update records, and create/update tables and fields. Pick the official one for lower-friction setup and Interface/base support; pick the community one for self-hosted control, record deletion, or comments.
 
 ### `airtable-schema`
 Runs `airtable-export-schema` to dump a base's full schema (tables, fields, views) to JSON and Markdown. Use this before writing scripts so you have accurate IDs.
