@@ -3,7 +3,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent))
 from conftest import load_bin_script
@@ -36,9 +35,13 @@ SCHEMA_B = {
             "description": "",
             "primaryFieldId": "fldAAA1",
             "fields": [
-                {"id": "fldAAA1", "name": "Full name", "type": "singleLineText"},  # renamed
+                {
+                    "id": "fldAAA1",
+                    "name": "Full name",
+                    "type": "singleLineText",
+                },  # renamed
                 {"id": "fldAAA2", "name": "Email", "type": "email"},
-                {"id": "fldAAA3", "name": "Phone", "type": "phoneNumber"},         # added
+                {"id": "fldAAA3", "name": "Phone", "type": "phoneNumber"},  # added
             ],
             "views": [
                 {"id": "viwAAA1", "name": "All", "type": "grid"},
@@ -89,24 +92,28 @@ def test_format_contains_table_name():
 
 def test_detects_type_change():
     schema_before = {
-        "tables": [{
-            "id": "tblX",
-            "name": "Thing",
-            "description": "",
-            "primaryFieldId": "fldX1",
-            "fields": [{"id": "fldX1", "name": "Score", "type": "singleLineText"}],
-            "views": [],
-        }]
+        "tables": [
+            {
+                "id": "tblX",
+                "name": "Thing",
+                "description": "",
+                "primaryFieldId": "fldX1",
+                "fields": [{"id": "fldX1", "name": "Score", "type": "singleLineText"}],
+                "views": [],
+            }
+        ]
     }
     schema_after = {
-        "tables": [{
-            "id": "tblX",
-            "name": "Thing",
-            "description": "",
-            "primaryFieldId": "fldX1",
-            "fields": [{"id": "fldX1", "name": "Score", "type": "number"}],
-            "views": [],
-        }]
+        "tables": [
+            {
+                "id": "tblX",
+                "name": "Thing",
+                "description": "",
+                "primaryFieldId": "fldX1",
+                "fields": [{"id": "fldX1", "name": "Score", "type": "number"}],
+                "views": [],
+            }
+        ]
     }
     diff = schema_diff.diff_schemas(schema_before, schema_after)
     assert len(diff.changed_tables) == 1
@@ -123,9 +130,14 @@ def test_cli_prints_diff(tmp_path):
     old_file.write_text(json.dumps(SCHEMA_A))
     new_file.write_text(json.dumps(SCHEMA_B))
     result = subprocess.run(
-        [sys.executable, str(Path(__file__).parent.parent / "bin" / "airtable-diff-schema"),
-         str(old_file), str(new_file)],
-        capture_output=True, text=True,
+        [
+            sys.executable,
+            str(Path(__file__).parent.parent / "bin" / "airtable-diff-schema"),
+            str(old_file),
+            str(new_file),
+        ],
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 0
     assert "Application" in result.stdout

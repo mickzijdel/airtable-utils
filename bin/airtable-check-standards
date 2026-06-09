@@ -29,10 +29,11 @@ from pathlib import Path
 # Violation dataclass
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Violation:
-    severity: str       # 'error' | 'warning'
-    entity_type: str    # 'table' | 'field' | 'view'
+    severity: str  # 'error' | 'warning'
+    entity_type: str  # 'table' | 'field' | 'view'
     entity_name: str
     table_name: str
     rule: str
@@ -48,7 +49,17 @@ class Violation:
 
 _DESCRIPTION_REQUIRED_KEYS = {"Description", "Last reviewed on"}
 _PREFIX_RE = re.compile(r"^\[.*?\]\s*")
-_NON_PLURAL_SUFFIXES = ("ss", "us", "is", "ness", "ous", "ious", "ess", "status", "progress")
+_NON_PLURAL_SUFFIXES = (
+    "ss",
+    "us",
+    "is",
+    "ness",
+    "ous",
+    "ious",
+    "ess",
+    "status",
+    "progress",
+)
 
 
 def check_schema(schema: dict) -> list[Violation]:
@@ -63,25 +74,59 @@ def _check_table(table: dict) -> list[Violation]:
     name = table["name"]
 
     if name and name[0] != name[0].upper():
-        v.append(Violation("error", "table", name, name, "table-sentence-case",
-                            f"Table '{name}' should start with an uppercase letter."))
+        v.append(
+            Violation(
+                "error",
+                "table",
+                name,
+                name,
+                "table-sentence-case",
+                f"Table '{name}' should start with an uppercase letter.",
+            )
+        )
 
     lower = name.lower()
     if lower.endswith("s") and not any(lower.endswith(s) for s in _NON_PLURAL_SUFFIXES):
-        v.append(Violation("warning", "table", name, name, "table-singular",
-                            f"Table '{name}' appears plural. Table names should be singular (e.g. 'Applicant')."))
+        v.append(
+            Violation(
+                "warning",
+                "table",
+                name,
+                name,
+                "table-singular",
+                f"Table '{name}' appears plural. Table names should be singular (e.g. 'Applicant').",
+            )
+        )
 
     desc = table.get("description") or ""
-    desc_keys = {line.split(":")[0].strip() for line in desc.splitlines() if ":" in line}
+    desc_keys = {
+        line.split(":")[0].strip() for line in desc.splitlines() if ":" in line
+    }
     missing = _DESCRIPTION_REQUIRED_KEYS - desc_keys
     if missing:
-        v.append(Violation("warning", "table", name, name, "table-description-keys",
-                            f"Table '{name}' description missing keys: {', '.join(sorted(missing))}."))
+        v.append(
+            Violation(
+                "warning",
+                "table",
+                name,
+                name,
+                "table-description-keys",
+                f"Table '{name}' description missing keys: {', '.join(sorted(missing))}.",
+            )
+        )
 
     view_names = [view["name"] for view in table.get("views", [])]
     if "All" not in view_names:
-        v.append(Violation("warning", "table", name, name, "table-missing-all-view",
-                            f"Table '{name}' has no 'All' view showing all records without filters."))
+        v.append(
+            Violation(
+                "warning",
+                "table",
+                name,
+                name,
+                "table-missing-all-view",
+                f"Table '{name}' has no 'All' view showing all records without filters.",
+            )
+        )
 
     for field in table.get("fields", []):
         v.extend(_check_field(field, table))
@@ -97,26 +142,66 @@ def _check_field(field: dict, table: dict) -> list[Violation]:
     ftype = field["type"]
 
     if name and name[0] != name[0].upper():
-        v.append(Violation("error", "field", raw_name, table_name, "field-sentence-case",
-                            f"Field '{raw_name}' in '{table_name}' should start with an uppercase letter."))
+        v.append(
+            Violation(
+                "error",
+                "field",
+                raw_name,
+                table_name,
+                "field-sentence-case",
+                f"Field '{raw_name}' in '{table_name}' should start with an uppercase letter.",
+            )
+        )
 
     if ftype == "checkbox" and not name.startswith("Is "):
-        v.append(Violation("warning", "field", raw_name, table_name, "field-boolean-is-prefix",
-                            f"Checkbox '{raw_name}' in '{table_name}' should start with 'Is ' (e.g. 'Is approved')."))
+        v.append(
+            Violation(
+                "warning",
+                "field",
+                raw_name,
+                table_name,
+                "field-boolean-is-prefix",
+                f"Checkbox '{raw_name}' in '{table_name}' should start with 'Is ' (e.g. 'Is approved').",
+            )
+        )
 
     if ftype == "date" and not name.endswith(" on"):
-        v.append(Violation("warning", "field", raw_name, table_name, "field-date-on-suffix",
-                            f"Date field '{raw_name}' in '{table_name}' should end in ' on' (e.g. 'Applied on')."))
+        v.append(
+            Violation(
+                "warning",
+                "field",
+                raw_name,
+                table_name,
+                "field-date-on-suffix",
+                f"Date field '{raw_name}' in '{table_name}' should end in ' on' (e.g. 'Applied on').",
+            )
+        )
 
     if ftype == "dateTime" and not name.endswith(" at"):
-        v.append(Violation("warning", "field", raw_name, table_name, "field-datetime-at-suffix",
-                            f"DateTime field '{raw_name}' in '{table_name}' should end in ' at' (e.g. 'Updated at')."))
+        v.append(
+            Violation(
+                "warning",
+                "field",
+                raw_name,
+                table_name,
+                "field-datetime-at-suffix",
+                f"DateTime field '{raw_name}' in '{table_name}' should end in ' at' (e.g. 'Updated at').",
+            )
+        )
 
     table_words = set(table_name.lower().split())
     field_words = set(name.lower().split())
     if table_words & field_words:
-        v.append(Violation("warning", "field", raw_name, table_name, "field-repeats-table-name",
-                            f"Field '{raw_name}' in '{table_name}' repeats the table name — omit it."))
+        v.append(
+            Violation(
+                "warning",
+                "field",
+                raw_name,
+                table_name,
+                "field-repeats-table-name",
+                f"Field '{raw_name}' in '{table_name}' repeats the table name — omit it.",
+            )
+        )
 
     return v
 
@@ -124,6 +209,7 @@ def _check_field(field: dict, table: dict) -> list[Violation]:
 # ---------------------------------------------------------------------------
 # Output formatter
 # ---------------------------------------------------------------------------
+
 
 def format_violations(violations: list[Violation]) -> str:
     if not violations:
@@ -135,7 +221,9 @@ def format_violations(violations: list[Violation]) -> str:
 
     errors_total = sum(1 for v in violations if v.severity == "error")
     warnings_total = len(violations) - errors_total
-    lines = [f"# Standards check: {len(violations)} violation(s) — {errors_total} error(s), {warnings_total} warning(s)\n"]
+    lines = [
+        f"# Standards check: {len(violations)} violation(s) — {errors_total} error(s), {warnings_total} warning(s)\n"
+    ]
 
     for table_name, tvs in sorted(by_table.items()):
         errors = [v for v in tvs if v.severity == "error"]
@@ -154,13 +242,18 @@ def format_violations(violations: list[Violation]) -> str:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Check an Airtable schema against BlueDot Impact Airtable Standards"
     )
     parser.add_argument("schema", help="Path to schema JSON file")
-    parser.add_argument("--output", "-o", help="Write report to this file (default: stdout)")
-    parser.add_argument("--errors-only", action="store_true", help="Only show errors, not warnings")
+    parser.add_argument(
+        "--output", "-o", help="Write report to this file (default: stdout)"
+    )
+    parser.add_argument(
+        "--errors-only", action="store_true", help="Only show errors, not warnings"
+    )
     args = parser.parse_args()
 
     schema_path = Path(args.schema)

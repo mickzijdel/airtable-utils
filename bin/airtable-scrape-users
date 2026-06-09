@@ -65,6 +65,7 @@ AIRTABLE_API_KEY_ENV = "AIRTABLE_API_KEY"  # Optional: for fetching base list
 @dataclass
 class UserInfo:
     """Represents a user with access to a base."""
+
     id: str
     email: str
     first_name: str
@@ -99,6 +100,7 @@ class UserInfo:
 @dataclass
 class BaseAccessReport:
     """Represents access information for a single base."""
+
     base_id: str
     base_name: str
     workspace_id: str
@@ -175,7 +177,8 @@ class AirtableScraper:
         self.browser = await self.playwright.chromium.launch(headless=self.headless)
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, *exc_info):
+        del exc_info  # required by the async-context-manager protocol; unused here
         if self.browser:
             await self.browser.close()
         await self.playwright.stop()
@@ -270,7 +273,9 @@ class AirtableScraper:
 
         for attempt in range(self.max_retries + 1):
             if attempt > 0:
-                print(f"  Retry {attempt}/{self.max_retries} after {backoff:.1f}s backoff...")
+                print(
+                    f"  Retry {attempt}/{self.max_retries} after {backoff:.1f}s backoff..."
+                )
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * backoff_multiplier, max_backoff)
 
@@ -312,7 +317,7 @@ class AirtableScraper:
                         base_name="Unknown",
                         workspace_id="Unknown",
                         workspace_name="Unknown",
-                        error="Failed to capture initialization data"
+                        error="Failed to capture initialization data",
                     )
 
                 return self._parse_access_data(base_id, self.captured_data)
@@ -327,7 +332,7 @@ class AirtableScraper:
                         base_name="Unknown",
                         workspace_id="Unknown",
                         workspace_name="Unknown",
-                        error=f"{'(after retries) ' if attempt > 0 else ''}{last_error}"
+                        error=f"{'(after retries) ' if attempt > 0 else ''}{last_error}",
                     )
 
                 print(f"  Transient error: {last_error}")
@@ -341,7 +346,7 @@ class AirtableScraper:
             base_name="Unknown",
             workspace_id="Unknown",
             workspace_name="Unknown",
-            error=last_error or "Unknown error"
+            error=last_error or "Unknown error",
         )
 
     async def _extract_from_source(self, page: Page) -> Optional[dict]:
@@ -351,15 +356,12 @@ class AirtableScraper:
         """
         content = await page.content()
 
-        # Find the function call in the HTML
-        pattern = r'window\.resolveLiveappDataPromise\((\{.*?\})\);'
-
-        # This is tricky because the JSON can be huge and span lines
-        # Try a different approach: find the script and parse it
+        # Find the function call in the HTML. The JSON can be huge and span
+        # lines, so match the script tag boundary rather than a balanced brace.
         match = re.search(
-            r'window\.resolveLiveappDataPromise\((.*?)\);?\s*<\/script>',
+            r"window\.resolveLiveappDataPromise\((.*?)\);?\s*<\/script>",
             content,
-            re.DOTALL
+            re.DOTALL,
         )
 
         if match:
@@ -422,7 +424,7 @@ class AirtableScraper:
             }
         """)
         if script_info:
-            print(f"  [DEBUG] Found data patterns in scripts:")
+            print("  [DEBUG] Found data patterns in scripts:")
             for pattern, context in script_info.items():
                 print(f"    - {pattern}: ...{context}...")
         else:
@@ -525,16 +527,22 @@ class AirtableScraper:
             # Skip service accounts
             if user_data.get("isServiceAccount"):
                 continue
-            if user_id in ("usrAISERVICE00000", "usrEXTERNALTBLSVC", "usrWORKFLOWEXESVC"):
+            if user_id in (
+                "usrAISERVICE00000",
+                "usrEXTERNALTBLSVC",
+                "usrWORKFLOWEXESVC",
+            ):
                 continue
 
-            users.append(UserInfo(
-                id=user_id,
-                email=user_data.get("email", ""),
-                first_name=user_data.get("firstName", ""),
-                last_name=user_data.get("lastName", ""),
-                permission_level=permission,
-            ))
+            users.append(
+                UserInfo(
+                    id=user_id,
+                    email=user_data.get("email", ""),
+                    first_name=user_data.get("firstName", ""),
+                    last_name=user_data.get("lastName", ""),
+                    permission_level=permission,
+                )
+            )
 
         # Sort by email for consistent output
         users.sort(key=lambda u: u.email.lower())
@@ -581,8 +589,7 @@ class AirtableScraper:
                 consecutive_errors += 1
                 # Increase delay after errors
                 current_delay = min(
-                    current_delay * error_delay_multiplier,
-                    max_delay_seconds
+                    current_delay * error_delay_multiplier, max_delay_seconds
                 )
                 print(f"  Increasing delay to {current_delay:.1f}s")
             else:
@@ -590,13 +597,17 @@ class AirtableScraper:
                 consecutive_errors = 0
                 # Gradually return to base delay after successes
                 if current_delay > delay_seconds:
-                    current_delay = max(delay_seconds, current_delay / error_delay_multiplier)
+                    current_delay = max(
+                        delay_seconds, current_delay / error_delay_multiplier
+                    )
 
             # Warn after many consecutive errors
             if consecutive_errors >= 5:
                 print(f"\n  WARNING: {consecutive_errors} consecutive errors!")
                 print("  This might indicate rate limiting or session expiry.")
-                print("  Consider: Re-running with --login or waiting before continuing.\n")
+                print(
+                    "  Consider: Re-running with --login or waiting before continuing.\n"
+                )
 
             if i < total:
                 await asyncio.sleep(current_delay)
@@ -681,7 +692,7 @@ def export_aggregated_csvs(reports: list[BaseAccessReport]):
             if base_id not in bases_data:
                 bases_data[base_id] = {
                     "base_name": base_name,
-                    "permissions": {level: [] for level in permission_levels}
+                    "permissions": {level: [] for level in permission_levels},
                 }
 
             for user in report.users:
@@ -695,7 +706,7 @@ def export_aggregated_csvs(reports: list[BaseAccessReport]):
                     users_data[user_id] = {
                         "name": name,
                         "email": email,
-                        "permissions": {level: [] for level in permission_levels}
+                        "permissions": {level: [] for level in permission_levels},
                     }
 
                 # Add base to user's permission list
@@ -711,7 +722,8 @@ def export_aggregated_csvs(reports: list[BaseAccessReport]):
 
         # Find workspace-wide users (those with access to ALL bases)
         workspace_wide_emails = {
-            data["email"] for _, data in users_data.items()
+            data["email"]
+            for _, data in users_data.items()
             if data["total_bases"] == total_bases_in_workspace
         }
 
@@ -730,46 +742,73 @@ def export_aggregated_csvs(reports: list[BaseAccessReport]):
         users_csv_path = OUTPUT_DIR / f"{safe_name}_users.csv"
         with open(users_csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow([
-                "user_id", "name", "email", "total_bases",
-                "owner_bases", "create_bases", "edit_bases", "comment_bases", "read_bases"
-            ])
+            writer.writerow(
+                [
+                    "user_id",
+                    "name",
+                    "email",
+                    "total_bases",
+                    "owner_bases",
+                    "create_bases",
+                    "edit_bases",
+                    "comment_bases",
+                    "read_bases",
+                ]
+            )
 
-            for user_id, data in sorted(users_data.items(), key=lambda x: -x[1]["total_bases"]):
-                writer.writerow([
-                    user_id,
-                    data["name"],
-                    data["email"],
-                    data["total_bases"],
-                    ", ".join(sorted(data["permissions"]["owner"])),
-                    ", ".join(sorted(data["permissions"]["create"])),
-                    ", ".join(sorted(data["permissions"]["edit"])),
-                    ", ".join(sorted(data["permissions"]["comment"])),
-                    ", ".join(sorted(data["permissions"]["read"])),
-                ])
+            for user_id, data in sorted(
+                users_data.items(), key=lambda x: -x[1]["total_bases"]
+            ):
+                writer.writerow(
+                    [
+                        user_id,
+                        data["name"],
+                        data["email"],
+                        data["total_bases"],
+                        ", ".join(sorted(data["permissions"]["owner"])),
+                        ", ".join(sorted(data["permissions"]["create"])),
+                        ", ".join(sorted(data["permissions"]["edit"])),
+                        ", ".join(sorted(data["permissions"]["comment"])),
+                        ", ".join(sorted(data["permissions"]["read"])),
+                    ]
+                )
 
         # Write bases CSV for this workspace (sorted by total_users descending)
         bases_csv_path = OUTPUT_DIR / f"{safe_name}_bases.csv"
         with open(bases_csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow([
-                "base_id", "base_name", "total_users", "base_specific_count", "base_specific_users",
-                "owner_users", "create_users", "edit_users", "comment_users", "read_users"
-            ])
+            writer.writerow(
+                [
+                    "base_id",
+                    "base_name",
+                    "total_users",
+                    "base_specific_count",
+                    "base_specific_users",
+                    "owner_users",
+                    "create_users",
+                    "edit_users",
+                    "comment_users",
+                    "read_users",
+                ]
+            )
 
-            for base_id, data in sorted(bases_data.items(), key=lambda x: -x[1]["total_users"]):
-                writer.writerow([
-                    base_id,
-                    data["base_name"],
-                    data["total_users"],
-                    data["base_specific_users_count"],
-                    ", ".join(data["base_specific_users_list"]),
-                    ", ".join(sorted(data["permissions"]["owner"])),
-                    ", ".join(sorted(data["permissions"]["create"])),
-                    ", ".join(sorted(data["permissions"]["edit"])),
-                    ", ".join(sorted(data["permissions"]["comment"])),
-                    ", ".join(sorted(data["permissions"]["read"])),
-                ])
+            for base_id, data in sorted(
+                bases_data.items(), key=lambda x: -x[1]["total_users"]
+            ):
+                writer.writerow(
+                    [
+                        base_id,
+                        data["base_name"],
+                        data["total_users"],
+                        data["base_specific_users_count"],
+                        ", ".join(data["base_specific_users_list"]),
+                        ", ".join(sorted(data["permissions"]["owner"])),
+                        ", ".join(sorted(data["permissions"]["create"])),
+                        ", ".join(sorted(data["permissions"]["edit"])),
+                        ", ".join(sorted(data["permissions"]["comment"])),
+                        ", ".join(sorted(data["permissions"]["read"])),
+                    ]
+                )
 
         files_created.append((ws_name, len(users_data), len(bases_data)))
         print(f"Exported {users_csv_path} ({len(users_data)} users)")
@@ -804,11 +843,13 @@ def generate_workspace_summary(reports: list[BaseAccessReport]) -> dict:
             }
 
         ws = summary[ws_id]
-        ws["bases"].append({
-            "base_id": report.base_id,
-            "base_name": report.base_name,
-            "user_count": len(report.users),
-        })
+        ws["bases"].append(
+            {
+                "base_id": report.base_id,
+                "base_name": report.base_name,
+                "user_count": len(report.users),
+            }
+        )
 
         for user in report.users:
             if user.email not in ws["users"]:
@@ -825,12 +866,14 @@ def generate_workspace_summary(reports: list[BaseAccessReport]) -> dict:
     for ws_id, ws in summary.items():
         users_list = []
         for email, data in ws["users"].items():
-            users_list.append({
-                "email": email,
-                "name": data["name"],
-                "base_count": len(data["bases"]),
-                "permissions": list(data["permissions"]),
-            })
+            users_list.append(
+                {
+                    "email": email,
+                    "name": data["name"],
+                    "base_count": len(data["bases"]),
+                    "permissions": list(data["permissions"]),
+                }
+            )
         users_list.sort(key=lambda u: u["email"])
 
         result[ws_id] = {
@@ -913,7 +956,9 @@ def get_workspace_base_ids(config: dict, workspace_filter: list[str]) -> list[st
     for ws_id, ws_data in workspaces.items():
         ws_name = ws_data.get("name", "")
         # Match by ID or name (case-insensitive)
-        if ws_id in workspace_filter or ws_name.lower() in [w.lower() for w in workspace_filter]:
+        if ws_id in workspace_filter or ws_name.lower() in [
+            w.lower() for w in workspace_filter
+        ]:
             base_ids.extend(ws_data.get("base_ids", []))
 
     return base_ids
@@ -933,10 +978,7 @@ def update_config_from_reports(config: dict, reports: list[BaseAccessReport]) ->
         ws_id = report.workspace_id or "Unknown"
 
         if ws_id not in workspaces:
-            workspaces[ws_id] = {
-                "name": report.workspace_name,
-                "base_ids": []
-            }
+            workspaces[ws_id] = {"name": report.workspace_name, "base_ids": []}
 
         # Update workspace name if we have a better one
         if report.workspace_name and report.workspace_name != "Unknown":
@@ -1015,23 +1057,27 @@ def compare_reports(old_file: Path, new_reports: list[BaseAccessReport]) -> dict
         # Added users
         for email in new_users:
             if email not in old_users:
-                changes["added_users"].append({
-                    "base_id": base_id,
-                    "base_name": base_name,
-                    "email": email,
-                    "name": new_users[email].full_name,
-                    "permission": new_users[email].permission_level,
-                })
+                changes["added_users"].append(
+                    {
+                        "base_id": base_id,
+                        "base_name": base_name,
+                        "email": email,
+                        "name": new_users[email].full_name,
+                        "permission": new_users[email].permission_level,
+                    }
+                )
 
         # Removed users
         for email in old_users:
             if email not in new_users:
-                changes["removed_users"].append({
-                    "base_id": base_id,
-                    "base_name": base_name,
-                    "email": email,
-                    "name": old_users[email].get("name", ""),
-                })
+                changes["removed_users"].append(
+                    {
+                        "base_id": base_id,
+                        "base_name": base_name,
+                        "email": email,
+                        "name": old_users[email].get("name", ""),
+                    }
+                )
 
         # Permission changes
         for email in new_users:
@@ -1039,13 +1085,15 @@ def compare_reports(old_file: Path, new_reports: list[BaseAccessReport]) -> dict
                 old_perm = old_users[email].get("permission_level", "")
                 new_perm = new_users[email].permission_level
                 if old_perm != new_perm:
-                    changes["permission_changes"].append({
-                        "base_id": base_id,
-                        "base_name": base_name,
-                        "email": email,
-                        "old_permission": old_perm,
-                        "new_permission": new_perm,
-                    })
+                    changes["permission_changes"].append(
+                        {
+                            "base_id": base_id,
+                            "base_name": base_name,
+                            "email": email,
+                            "old_permission": old_perm,
+                            "new_permission": new_perm,
+                        }
+                    )
 
     return changes
 
@@ -1079,11 +1127,17 @@ def print_changes(changes: dict) -> None:
     if changes["permission_changes"]:
         print(f"\n🔑 Permission changes ({len(changes['permission_changes'])}):")
         for u in changes["permission_changes"]:
-            print(f"  ~ {u['email']} @ {u['base_name']}: {u['old_permission']} → {u['new_permission']}")
+            print(
+                f"  ~ {u['email']} @ {u['base_name']}: {u['old_permission']} → {u['new_permission']}"
+            )
 
-    total = (len(changes["added_users"]) + len(changes["removed_users"]) +
-             len(changes["permission_changes"]) + len(changes["new_bases"]) +
-             len(changes["removed_bases"]))
+    total = (
+        len(changes["added_users"])
+        + len(changes["removed_users"])
+        + len(changes["permission_changes"])
+        + len(changes["new_bases"])
+        + len(changes["removed_bases"])
+    )
 
     if total == 0:
         print("\n✓ No changes detected")
@@ -1094,23 +1148,68 @@ def print_changes(changes: dict) -> None:
 async def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="Scrape Airtable base user access data")
-    parser.add_argument("--login", action="store_true", help="Login and save auth state")
+    parser = argparse.ArgumentParser(
+        description="Scrape Airtable base user access data"
+    )
+    parser.add_argument(
+        "--login", action="store_true", help="Login and save auth state"
+    )
     parser.add_argument("--bases", nargs="+", help="Specific base IDs to scrape")
-    parser.add_argument("--workspace", nargs="+", help="Filter to specific workspace(s) by ID or name")
-    parser.add_argument("--from-api", action="store_true", help="Fetch base list from API")
-    parser.add_argument("--save-config", action="store_true", help="Save/update workspace config from results")
-    parser.add_argument("--show-config", action="store_true", help="Show current config and exit")
-    parser.add_argument("--headless", action="store_true", default=True, help="Run headless")
+    parser.add_argument(
+        "--workspace", nargs="+", help="Filter to specific workspace(s) by ID or name"
+    )
+    parser.add_argument(
+        "--from-api", action="store_true", help="Fetch base list from API"
+    )
+    parser.add_argument(
+        "--save-config",
+        action="store_true",
+        help="Save/update workspace config from results",
+    )
+    parser.add_argument(
+        "--show-config", action="store_true", help="Show current config and exit"
+    )
+    parser.add_argument(
+        "--headless", action="store_true", default=True, help="Run headless"
+    )
     parser.add_argument("--no-headless", dest="headless", action="store_false")
-    parser.add_argument("--delay", type=float, default=1.0, help="Delay between bases (seconds)")
-    parser.add_argument("--no-compare", action="store_true", help="Skip comparison with previous run")
-    parser.add_argument("--debug", action="store_true", help="Save debug info (HTML, globals, network) to diagnose capture issues")
-    parser.add_argument("--max-retries", type=int, default=3, help="Maximum retries for transient errors (default: 3)")
-    parser.add_argument("--context-recycle", type=int, default=15, help="Recycle browser context every N requests (default: 15)")
-    parser.add_argument("--max-delay", type=float, default=10.0, help="Maximum adaptive delay after errors in seconds (default: 10)")
-    parser.add_argument("--export-csv-from-json", type=str, nargs="?", const="default", metavar="JSON_FILE",
-                        help="Export CSV files from existing JSON (default: output/airtable_users_export.json)")
+    parser.add_argument(
+        "--delay", type=float, default=1.0, help="Delay between bases (seconds)"
+    )
+    parser.add_argument(
+        "--no-compare", action="store_true", help="Skip comparison with previous run"
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Save debug info (HTML, globals, network) to diagnose capture issues",
+    )
+    parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=3,
+        help="Maximum retries for transient errors (default: 3)",
+    )
+    parser.add_argument(
+        "--context-recycle",
+        type=int,
+        default=15,
+        help="Recycle browser context every N requests (default: 15)",
+    )
+    parser.add_argument(
+        "--max-delay",
+        type=float,
+        default=10.0,
+        help="Maximum adaptive delay after errors in seconds (default: 10)",
+    )
+    parser.add_argument(
+        "--export-csv-from-json",
+        type=str,
+        nargs="?",
+        const="default",
+        metavar="JSON_FILE",
+        help="Export CSV files from existing JSON (default: output/airtable_users_export.json)",
+    )
 
     args = parser.parse_args()
 
@@ -1130,7 +1229,11 @@ async def main():
 
     # Export CSVs from existing JSON and exit
     if args.export_csv_from_json:
-        json_path = OUTPUT_FILE if args.export_csv_from_json == "default" else Path(args.export_csv_from_json)
+        json_path = (
+            OUTPUT_FILE
+            if args.export_csv_from_json == "default"
+            else Path(args.export_csv_from_json)
+        )
         if not json_path.exists():
             print(f"Error: JSON file not found: {json_path}")
             return
@@ -1167,7 +1270,9 @@ async def main():
                 print(f"No bases found for workspace(s): {args.workspace}")
                 print_config_summary(config)
                 return
-            print(f"Filtering to {len(base_ids)} bases in workspace(s): {args.workspace}")
+            print(
+                f"Filtering to {len(base_ids)} bases in workspace(s): {args.workspace}"
+            )
         elif config.get("workspaces"):
             base_ids = get_all_base_ids(config)
             if not base_ids:
@@ -1189,8 +1294,11 @@ async def main():
         # Back up previous output
         previous_output = None
         if OUTPUT_FILE.exists() and not args.no_compare:
-            backup_path = OUTPUT_FILE.with_suffix(f".{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+            backup_path = OUTPUT_FILE.with_suffix(
+                f".{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            )
             import shutil
+
             shutil.copy(OUTPUT_FILE, backup_path)
             previous_output = backup_path
             print(f"Previous output backed up to {backup_path}")
@@ -1223,7 +1331,7 @@ async def main():
             "successful": sum(1 for r in reports if not r.error),
             "failed": sum(1 for r in reports if r.error),
             "workspace_summary": generate_workspace_summary(reports),
-            "bases": [r.to_dict() for r in reports]
+            "bases": [r.to_dict() for r in reports],
         }
 
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
@@ -1235,7 +1343,7 @@ async def main():
         export_aggregated_csvs(reports)
 
         # Summary
-        print(f"\nSummary:")
+        print("\nSummary:")
         print(f"  Scraped: {len(reports)} bases")
         print(f"  Successful: {output['successful']}")
         print(f"  Failed: {output['failed']}")

@@ -3,3 +3,6 @@ output/
 *_schema.json
 *_schema.md
 __pycache__
+.venv/
+.pytest_cache/
+mise.local.toml

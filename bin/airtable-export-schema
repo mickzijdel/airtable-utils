@@ -71,10 +71,7 @@ def get_base_schema(token: str, base_id: str) -> dict[str, Any]:
         Dictionary containing the full base schema
     """
     url = f"https://api.airtable.com/v0/meta/bases/{base_id}/tables"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     response = requests.get(url, headers=headers)
     response.raise_for_status()
@@ -126,7 +123,9 @@ def _build_summary(schema: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_output(schema: dict[str, Any], base_id: str, base_name: str) -> dict[str, Any]:
+def build_output(
+    schema: dict[str, Any], base_id: str, base_name: str
+) -> dict[str, Any]:
     """
     Wrap the raw Airtable schema with base identity for the JSON export.
 
@@ -268,7 +267,9 @@ def _summarize_field_options(field_type: str, options: dict[str, Any]) -> str:
     return ""
 
 
-def format_schema_as_markdown(schema: dict[str, Any], base_id: str, base_name: str) -> str:
+def format_schema_as_markdown(
+    schema: dict[str, Any], base_id: str, base_name: str
+) -> str:
     """
     Convert the schema to a readable markdown format.
 
@@ -348,25 +349,29 @@ def main():
         description="Export Airtable base schema to JSON or Markdown"
     )
     parser.add_argument(
-        "--token", "-t",
+        "--token",
+        "-t",
         default=os.environ.get("AIRTABLE_TOKEN"),
-        help="Airtable Personal Access Token (or set AIRTABLE_TOKEN env var)"
+        help="Airtable Personal Access Token (or set AIRTABLE_TOKEN env var)",
     )
     parser.add_argument(
-        "--base", "-b",
+        "--base",
+        "-b",
         default=os.environ.get("AIRTABLE_BASE_ID"),
-        help="Base ID (starts with 'app') (or set AIRTABLE_BASE_ID env var)"
+        help="Base ID (starts with 'app') (or set AIRTABLE_BASE_ID env var)",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         default="schema.json",
-        help="Output filename (use .json or .md extension)"
+        help="Output filename (use .json or .md extension)",
     )
     parser.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=["json", "markdown", "both"],
         default="both",
-        help="Output format"
+        help="Output format",
     )
 
     args = parser.parse_args()

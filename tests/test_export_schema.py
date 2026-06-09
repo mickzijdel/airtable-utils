@@ -16,6 +16,7 @@ build_summary = export_schema._build_summary
 # build_output (JSON wrapper carrying base identity)
 # ---------------------------------------------------------------------------
 
+
 def test_build_output_adds_base_identity():
     schema = {"tables": [{"id": "tblA", "name": "Applicant"}]}
     out = build_output(schema, "appXXX", "My Base")
@@ -68,6 +69,7 @@ def test_build_output_includes_summary():
 # _primary_field_name
 # ---------------------------------------------------------------------------
 
+
 def test_primary_field_name_resolves_non_first_field():
     table = {
         "primaryFieldId": "fld3",
@@ -81,7 +83,9 @@ def test_primary_field_name_resolves_non_first_field():
 
 
 def test_primary_field_name_falls_back_to_first_field():
-    table = {"fields": [{"id": "fld1", "name": "First"}, {"id": "fld2", "name": "Second"}]}
+    table = {
+        "fields": [{"id": "fld1", "name": "First"}, {"id": "fld2", "name": "Second"}]
+    }
     assert primary_field_name(table) == "First"
     # unmatched id also falls back to first
     table_bad = {"primaryFieldId": "nope", "fields": table["fields"]}
@@ -97,6 +101,7 @@ def test_primary_field_name_empty_fields():
 # _build_summary
 # ---------------------------------------------------------------------------
 
+
 def test_build_summary_totals_and_per_table():
     schema = {
         "tables": [
@@ -104,7 +109,10 @@ def test_build_summary_totals_and_per_table():
                 "id": "tblA",
                 "name": "Applicant",
                 "primaryFieldId": "fld1",
-                "fields": [{"id": "fld1", "name": "Name"}, {"id": "fld2", "name": "Age"}],
+                "fields": [
+                    {"id": "fld1", "name": "Name"},
+                    {"id": "fld2", "name": "Age"},
+                ],
                 "views": [{"id": "v1", "name": "Grid"}, {"id": "v2", "name": "Form"}],
             },
             {
@@ -129,6 +137,7 @@ def test_build_summary_totals_and_per_table():
 # _summarize_field_options
 # ---------------------------------------------------------------------------
 
+
 def test_number_precision():
     assert summarize("number", {"precision": 2}) == "precision: 2"
     assert summarize("percent", {"precision": 0}) == "precision: 0"
@@ -139,18 +148,26 @@ def test_currency_symbol_and_precision():
 
 
 def test_date_and_datetime_formats():
-    assert summarize("date", {"dateFormat": {"name": "local", "format": "l"}}) == "local"
-    out = summarize("dateTime", {
-        "dateFormat": {"name": "local"},
-        "timeFormat": {"name": "24hour"},
-        "timeZone": "America/New_York",
-    })
+    assert (
+        summarize("date", {"dateFormat": {"name": "local", "format": "l"}}) == "local"
+    )
+    out = summarize(
+        "dateTime",
+        {
+            "dateFormat": {"name": "local"},
+            "timeFormat": {"name": "24hour"},
+            "timeZone": "America/New_York",
+        },
+    )
     assert out == "local · 24hour · America/New_York"
 
 
 def test_rating_and_checkbox():
     assert summarize("rating", {"max": 5, "icon": "star"}) == "max 5 · star"
-    assert summarize("checkbox", {"icon": "check", "color": "greenBright"}) == "check · greenBright"
+    assert (
+        summarize("checkbox", {"icon": "check", "color": "greenBright"})
+        == "check · greenBright"
+    )
 
 
 def test_selects_list_every_choice():
@@ -163,25 +180,36 @@ def test_selects_list_every_choice():
 
 def test_record_links_flags():
     assert summarize("multipleRecordLinks", {"linkedTableId": "tblXXX"}) == "→ `tblXXX`"
-    out = summarize("multipleRecordLinks", {
-        "linkedTableId": "tblXXX", "isReversed": True, "prefersSingleRecordLink": True,
-    })
+    out = summarize(
+        "multipleRecordLinks",
+        {
+            "linkedTableId": "tblXXX",
+            "isReversed": True,
+            "prefersSingleRecordLink": True,
+        },
+    )
     assert out == "→ `tblXXX` (reversed, single)"
 
 
 def test_rollup_lookup_count():
     assert summarize("count", {"recordLinkFieldId": "fldLink"}) == "via `fldLink`"
-    out = summarize("rollup", {
-        "recordLinkFieldId": "fldLink",
-        "fieldIdInLinkedTable": "fldRemote",
-        "result": {"type": "number"},
-    })
+    out = summarize(
+        "rollup",
+        {
+            "recordLinkFieldId": "fldLink",
+            "fieldIdInLinkedTable": "fldRemote",
+            "result": {"type": "number"},
+        },
+    )
     assert out == "via `fldLink` → `fldRemote` · result: number"
-    out = summarize("multipleLookupValues", {
-        "recordLinkFieldId": "fldLink",
-        "fieldIdInLinkedTable": "fldRemote",
-        "result": {"type": "singleLineText"},
-    })
+    out = summarize(
+        "multipleLookupValues",
+        {
+            "recordLinkFieldId": "fldLink",
+            "fieldIdInLinkedTable": "fldRemote",
+            "result": {"type": "singleLineText"},
+        },
+    )
     assert out == "via `fldLink` → `fldRemote` · result: singleLineText"
 
 
@@ -190,8 +218,17 @@ def test_formula_result_type():
 
 
 def test_optionless_types_return_empty():
-    for ftype in ("singleLineText", "email", "url", "phoneNumber", "barcode",
-                  "autoNumber", "button", "createdBy", "richText"):
+    for ftype in (
+        "singleLineText",
+        "email",
+        "url",
+        "phoneNumber",
+        "barcode",
+        "autoNumber",
+        "button",
+        "createdBy",
+        "richText",
+    ):
         assert summarize(ftype, {}) == ""
 
 
@@ -208,20 +245,52 @@ SCHEMA = {
             "name": "Applicant",
             "description": "",
             "fields": [
-                {"id": "fld1", "name": "Score", "type": "number", "options": {"precision": 1}},
-                {"id": "fld2", "name": "Fee", "type": "currency",
-                 "options": {"symbol": "£", "precision": 2}},
-                {"id": "fld3", "name": "Applied", "type": "date",
-                 "options": {"dateFormat": {"name": "iso"}}},
-                {"id": "fld4", "name": "Stage", "type": "singleSelect",
-                 "options": {"choices": [{"name": f"S{i}"} for i in range(6)]}},
-                {"id": "fld5", "name": "Cohort", "type": "multipleRecordLinks",
-                 "options": {"linkedTableId": "tblB", "isReversed": True}},
-                {"id": "fld6", "name": "Total", "type": "rollup",
-                 "options": {"recordLinkFieldId": "fld5",
-                             "fieldIdInLinkedTable": "fldX", "result": {"type": "number"}}},
-                {"id": "fld7", "name": "Notes", "type": "multilineText",
-                 "description": LONG_DESC},
+                {
+                    "id": "fld1",
+                    "name": "Score",
+                    "type": "number",
+                    "options": {"precision": 1},
+                },
+                {
+                    "id": "fld2",
+                    "name": "Fee",
+                    "type": "currency",
+                    "options": {"symbol": "£", "precision": 2},
+                },
+                {
+                    "id": "fld3",
+                    "name": "Applied",
+                    "type": "date",
+                    "options": {"dateFormat": {"name": "iso"}},
+                },
+                {
+                    "id": "fld4",
+                    "name": "Stage",
+                    "type": "singleSelect",
+                    "options": {"choices": [{"name": f"S{i}"} for i in range(6)]},
+                },
+                {
+                    "id": "fld5",
+                    "name": "Cohort",
+                    "type": "multipleRecordLinks",
+                    "options": {"linkedTableId": "tblB", "isReversed": True},
+                },
+                {
+                    "id": "fld6",
+                    "name": "Total",
+                    "type": "rollup",
+                    "options": {
+                        "recordLinkFieldId": "fld5",
+                        "fieldIdInLinkedTable": "fldX",
+                        "result": {"type": "number"},
+                    },
+                },
+                {
+                    "id": "fld7",
+                    "name": "Notes",
+                    "type": "multilineText",
+                    "description": LONG_DESC,
+                },
             ],
             "views": [{"id": "viw1", "name": "All", "type": "grid"}],
         }

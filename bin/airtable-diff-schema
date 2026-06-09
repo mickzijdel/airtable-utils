@@ -27,6 +27,7 @@ from pathlib import Path
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class FieldChange:
     field_name: str
@@ -41,19 +42,27 @@ class TableDiff:
     old_name: str | None = None
     added_fields: list[dict] = field(default_factory=list)
     removed_fields: list[dict] = field(default_factory=list)
-    renamed_fields: list[tuple] = field(default_factory=list)   # (id, old_name, new_name)
+    renamed_fields: list[tuple] = field(
+        default_factory=list
+    )  # (id, old_name, new_name)
     changed_fields: list[FieldChange] = field(default_factory=list)
     added_views: list[dict] = field(default_factory=list)
     removed_views: list[dict] = field(default_factory=list)
-    renamed_views: list[tuple] = field(default_factory=list)    # (id, old_name, new_name)
+    renamed_views: list[tuple] = field(default_factory=list)  # (id, old_name, new_name)
 
     def has_changes(self) -> bool:
-        return any([
-            self.old_name,
-            self.added_fields, self.removed_fields,
-            self.renamed_fields, self.changed_fields,
-            self.added_views, self.removed_views, self.renamed_views,
-        ])
+        return any(
+            [
+                self.old_name,
+                self.added_fields,
+                self.removed_fields,
+                self.renamed_fields,
+                self.changed_fields,
+                self.added_views,
+                self.removed_views,
+                self.renamed_views,
+            ]
+        )
 
 
 @dataclass
@@ -70,6 +79,7 @@ class SchemaDiff:
 # Diff logic
 # ---------------------------------------------------------------------------
 
+
 def diff_schemas(old: dict, new: dict) -> SchemaDiff:
     old_tables = {t["id"]: t for t in old.get("tables", [])}
     new_tables = {t["id"]: t for t in new.get("tables", [])}
@@ -84,7 +94,9 @@ def diff_schemas(old: dict, new: dict) -> SchemaDiff:
             if td.has_changes():
                 changed.append(td)
 
-    return SchemaDiff(added_tables=added, removed_tables=removed, changed_tables=changed)
+    return SchemaDiff(
+        added_tables=added, removed_tables=removed, changed_tables=changed
+    )
 
 
 def _diff_table(old: dict, new: dict) -> TableDiff:
@@ -112,7 +124,9 @@ def _diff_table(old: dict, new: dict) -> TableDiff:
     td.removed_views = [old_views[i] for i in old_views if i not in new_views]
     for vid in old_views:
         if vid in new_views and old_views[vid]["name"] != new_views[vid]["name"]:
-            td.renamed_views.append((vid, old_views[vid]["name"], new_views[vid]["name"]))
+            td.renamed_views.append(
+                (vid, old_views[vid]["name"], new_views[vid]["name"])
+            )
 
     return td
 
@@ -121,7 +135,10 @@ def _diff_table(old: dict, new: dict) -> TableDiff:
 # Output formatter
 # ---------------------------------------------------------------------------
 
-def format_diff_as_markdown(diff: SchemaDiff, old_label: str = "old", new_label: str = "new") -> str:
+
+def format_diff_as_markdown(
+    diff: SchemaDiff, old_label: str = "old", new_label: str = "new"
+) -> str:
     lines = [f"# Schema diff: {old_label} → {new_label}\n"]
 
     if not diff.has_changes():
@@ -159,7 +176,9 @@ def format_diff_as_markdown(diff: SchemaDiff, old_label: str = "old", new_label:
         if td.changed_fields:
             lines.append("### Type changes")
             for fc in td.changed_fields:
-                lines.append(f"  - **{fc.field_name}**: `{fc.old_type}` → `{fc.new_type}`")
+                lines.append(
+                    f"  - **{fc.field_name}**: `{fc.old_type}` → `{fc.new_type}`"
+                )
         if td.added_views:
             lines.append("### Added views")
             for v in td.added_views:
@@ -181,11 +200,16 @@ def format_diff_as_markdown(diff: SchemaDiff, old_label: str = "old", new_label:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Diff two Airtable schema JSON exports")
+    parser = argparse.ArgumentParser(
+        description="Diff two Airtable schema JSON exports"
+    )
     parser.add_argument("old_schema", help="Path to the older schema JSON file")
     parser.add_argument("new_schema", help="Path to the newer schema JSON file")
-    parser.add_argument("--output", "-o", help="Write diff to this file (default: stdout)")
+    parser.add_argument(
+        "--output", "-o", help="Write diff to this file (default: stdout)"
+    )
     args = parser.parse_args()
 
     old_path = Path(args.old_schema)
@@ -200,7 +224,9 @@ def main() -> None:
     new_schema = json.loads(new_path.read_text())
 
     diff = diff_schemas(old_schema, new_schema)
-    report = format_diff_as_markdown(diff, old_label=old_path.name, new_label=new_path.name)
+    report = format_diff_as_markdown(
+        diff, old_label=old_path.name, new_label=new_path.name
+    )
 
     if args.output:
         out = Path(args.output)

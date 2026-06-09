@@ -1,0 +1,45 @@
+# Dev-tooling manifest only (readoc-style). The plugin's scripts/CLIs stay
+# self-contained — Python ones use PEP 723 inline deps and run via `uv run --script`
+# (shebang: #!/usr/bin/env -S uv run --script). This file exists purely so contributors
+# get a reproducible test/lint environment; it declares no runtime dependencies and is
+# never built or installed (package = false).
+[project]
+name = "airtable-utils"
+version = "0.0.0"
+description = "Dev tooling for the airtable-utils Claude Code plugin."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+    "vulture",   # dead-code audit; run via `uv run vulture`
+    # Mirror here any libraries the bundled scripts declare in their PEP 723 blocks,
+    # so the test environment can import/run them.
+    "requests",              # bin/airtable-export-schema
+    "playwright",            # bin/airtable-scrape-users
+    "aiohttp",               # bin/airtable-scrape-users
+]
+
+[tool.uv]
+package = false
+# Dependency cooldown (dev-env standard v6): don't resolve a release until it's been public
+# ≥4 days, so a malicious upload is caught/yanked before it lands here. Rolling duration, so the
+# window moves with today's date. Urgent override: exclude-newer-package = { foo = "0 days" }.
+exclude-newer = "4 days"
+
+[tool.ruff]
+# Extensionless Python scripts (e.g. bin/foo) aren't discovered by `ruff check .`.
+# List the *Python* ones explicitly so a bare `ruff check .` covers them. Do NOT use a
+# blanket "bin/*" if bin/ also holds shell scripts — ruff would try to parse those as
+# Python and fail. (hk/CI lint these via shebang detection regardless of this setting.)
+extend-include = [
+    "bin/airtable-export-schema",
+    "bin/airtable-diff-schema",
+    "bin/airtable-check-standards",
+    "bin/airtable-scrape-users",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
