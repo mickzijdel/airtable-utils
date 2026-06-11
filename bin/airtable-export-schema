@@ -15,12 +15,15 @@ Usage:
     airtable-export-schema --token YOUR_TOKEN --base BASE_ID
     AIRTABLE_TOKEN=YOUR_TOKEN AIRTABLE_BASE_ID=BASE_ID airtable-export-schema
 
-Credentials can also be placed in a .env file in the current directory.
+Credentials can also be placed in a .env file in the current directory (or next
+to the script). Users of fnox can wrap the command instead:
+    fnox exec -- airtable-export-schema
 """
 
 import argparse
 import json
 import os
+import shutil
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -44,6 +47,13 @@ def _load_dotenv(env_path: Path) -> None:
 
 _load_dotenv(Path.cwd() / ".env")
 _load_dotenv(Path(__file__).parent / ".env")
+
+
+def _fnox_hint(example: str) -> str:
+    """Suggest fnox exec in error messages, but only when fnox is installed."""
+    if shutil.which("fnox") is None:
+        return ""
+    return f", or run via fnox: fnox exec -- {example}"
 
 
 def get_base_info(token: str, base_id: str) -> str:
@@ -377,9 +387,17 @@ def main():
     args = parser.parse_args()
 
     if not args.token:
-        parser.error("--token is required (or set AIRTABLE_TOKEN env var)")
+        parser.error(
+            "--token is required. Set the AIRTABLE_TOKEN env var or put it in a "
+            ".env file in the current directory"
+            f"{_fnox_hint('airtable-export-schema ...')}"
+        )
     if not args.base:
-        parser.error("--base is required (or set AIRTABLE_BASE_ID env var)")
+        parser.error(
+            "--base is required. Set the AIRTABLE_BASE_ID env var or put it in a "
+            ".env file in the current directory"
+            f"{_fnox_hint('airtable-export-schema ...')}"
+        )
 
     print(f"Fetching schema for base: {args.base}")
     base_name = get_base_info(args.token, args.base)

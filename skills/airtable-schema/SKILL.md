@@ -61,7 +61,13 @@ airtable-export-schema
 airtable-export-schema --token YOUR_PAT --base appXXXXXXXXXX --format json
 ```
 
-## Using a .env File (Recommended)
+## Credentials
+
+Credentials are resolved in order: **CLI flags → environment variables → `.env` file** (current working directory, then the script's own directory).
+
+> **Agents: never read `.env`** (no `cat`, `head`, `grep`, or the Read tool) — it contains secret values and access is typically deny-listed. Don't pre-check that credentials exist either. Just run the command: it loads `.env` automatically and exits with a clear error naming the missing variable if credentials aren't found. React to that error — the message suggests `fnox exec -- <command>` only when fnox is installed; retry with that if a `fnox.toml` is in scope, otherwise relay the error to the user.
+
+### Using a .env File
 
 Place a `.env` file in the directory where you run the command. The script loads it automatically.
 
@@ -78,6 +84,16 @@ airtable-export-schema
 ```
 
 **Per-folder credentials:** Because the script looks for `.env` in the *current working directory* first, you can keep a separate `.env` per project folder, each pointing at a different base or token.
+
+### Using fnox (optional)
+
+If the project manages secrets with [fnox](https://github.com/jdx/fnox) (a `fnox.toml` in the current directory or a parent), wrap the command so fnox resolves the secrets at run time:
+
+```bash
+fnox exec -- airtable-export-schema
+```
+
+Note: fnox's `fnox activate` cd-hook only fires in interactive shells — in non-interactive (agent) shells the `fnox exec` wrapper is required.
 
 Output files are written to the current directory, named:
 ```

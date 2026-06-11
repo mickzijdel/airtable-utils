@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent))
 from conftest import load_bin_script
 
@@ -331,3 +333,46 @@ def test_markdown_per_table_stats_line():
     md = render(SCHEMA, "appXXX", "Test Base")
     # primaryFieldId absent -> falls back to first field "Score"
     assert "**Primary field:** Score · **Fields:** 7 · **Views:** 1" in md
+
+
+# ---------------------------------------------------------------------------
+# credential error messages (_fnox_hint, main() without credentials)
+# ---------------------------------------------------------------------------
+
+
+def test_fnox_hint_when_fnox_installed(monkeypatch):
+    monkeypatch.setattr(export_schema.shutil, "which", lambda _: "/usr/bin/fnox")
+    hint = export_schema._fnox_hint("airtable-export-schema ...")
+    assert hint == ", or run via fnox: fnox exec -- airtable-export-schema ..."
+
+
+def test_fnox_hint_when_fnox_not_installed(monkeypatch):
+    monkeypatch.setattr(export_schema.shutil, "which", lambda _: None)
+    assert export_schema._fnox_hint("airtable-export-schema ...") == ""
+
+
+def test_main_without_token_names_env_var_and_dotenv(monkeypatch, capsys):
+    monkeypatch.delenv("AIRTABLE_TOKEN", raising=False)
+    monkeypatch.delenv("AIRTABLE_BASE_ID", raising=False)
+    monkeypatch.setattr(sys, "argv", ["airtable-export-schema"])
+    with pytest.raises(SystemExit):
+        export_schema.main()
+    err = capsys.readouterr().err
+    assert "AIRTABLE_TOKEN" in err
+    assert ".env" in err
+
+
+def test_main_without_token_suggests_fnox_only_when_installed(monkeypatch, capsys):
+    monkeypatch.delenv("AIRTABLE_TOKEN", raising=False)
+    monkeypatch.delenv("AIRTABLE_BASE_ID", raising=False)
+    monkeypatch.setattr(sys, "argv", ["airtable-export-schema"])
+
+    monkeypatch.setattr(export_schema.shutil, "which", lambda _: "/usr/bin/fnox")
+    with pytest.raises(SystemExit):
+        export_schema.main()
+    assert "fnox exec -- airtable-export-schema" in capsys.readouterr().err
+
+    monkeypatch.setattr(export_schema.shutil, "which", lambda _: None)
+    with pytest.raises(SystemExit):
+        export_schema.main()
+    assert "fnox" not in capsys.readouterr().err

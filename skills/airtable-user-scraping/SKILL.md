@@ -50,6 +50,14 @@ airtable-scrape-users --from-api --save-config
 AIRTABLE_API_KEY=patXXXXXXXXXX
 ```
 
+If the project manages secrets with [fnox](https://github.com/jdx/fnox) (a `fnox.toml` in scope), wrap the command instead — required in non-interactive (agent) shells, where the `fnox activate` cd-hook doesn't fire:
+
+```bash
+fnox exec -- airtable-scrape-users --from-api --save-config
+```
+
+> **Agents: never read `.env`** (no `cat`, `head`, `grep`, or the Read tool) — it contains secret values and access is typically deny-listed. Don't pre-check that credentials exist. Just run the command: it loads `.env` automatically and errors clearly if `AIRTABLE_API_KEY` is missing. React to that error — the message suggests `fnox exec` only when fnox is installed; retry with that if a `fnox.toml` is in scope, otherwise relay the error to the user.
+
 ### Step 3: Scrape user data
 
 Uses the saved config. Shows changes compared to the previous run.

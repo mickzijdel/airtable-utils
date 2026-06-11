@@ -91,6 +91,8 @@ airtable-scrape-users                                  # scrape
 
 ## Credentials
 
+Credentials are resolved in order: **CLI flags → environment variables → `.env` file** (current working directory, then the script's directory).
+
 Place a `.env` file in the directory you run the commands from:
 
 ```dotenv
@@ -98,6 +100,14 @@ AIRTABLE_TOKEN=patXXXXXXXXXX       # for airtable-export-schema
 AIRTABLE_API_KEY=patXXXXXXXXXX     # for airtable-scrape-users
 AIRTABLE_BASE_ID=appXXXXXXXX       # optional, for airtable-export-schema
 ```
+
+Alternatively, if you manage secrets with [fnox](https://github.com/jdx/fnox), wrap any command so the secrets referenced in your `fnox.toml` are resolved at run time:
+
+```bash
+fnox exec -- airtable-export-schema   # resolves secrets from fnox.toml at run time
+```
+
+The missing-credential error messages suggest the `fnox exec` form only when fnox is installed.
 
 ## Installation
 

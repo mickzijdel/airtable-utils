@@ -20,12 +20,15 @@ Note: playwright requires a one-time browser install:
 
 Credentials can be placed in a .env file in the current directory:
     AIRTABLE_API_KEY=patXXXXXXXXXX
+Users of fnox can wrap the command instead:
+    fnox exec -- airtable-scrape-users --from-api --save-config
 """
 
 import asyncio
 import json
 import os
 import re
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -47,6 +50,13 @@ def _load_dotenv(env_path: Path) -> None:
             key = key.strip()
             value = value.strip().strip('"').strip("'")
             os.environ.setdefault(key, value)
+
+
+def _fnox_hint(example: str) -> str:
+    """Suggest fnox exec in error messages, but only when fnox is installed."""
+    if shutil.which("fnox") is None:
+        return ""
+    return f", or run via fnox: fnox exec -- {example}"
 
 
 # Configuration
@@ -623,8 +633,9 @@ async def fetch_base_ids_from_api() -> list[str]:
     api_key = os.environ.get(AIRTABLE_API_KEY_ENV)
     if not api_key:
         raise ValueError(
-            f"Set {AIRTABLE_API_KEY_ENV} environment variable to fetch base list, "
-            "or provide base IDs directly."
+            f"Set the {AIRTABLE_API_KEY_ENV} env var to fetch the base list, put "
+            "it in a .env file in the current directory, provide base IDs directly"
+            f"{_fnox_hint('airtable-scrape-users --from-api ...')}."
         )
 
     import aiohttp
