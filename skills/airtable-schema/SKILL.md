@@ -25,14 +25,16 @@ Both cover read/search/create/update of records and create/update of tables and 
 
 This skill is for exporting schema metadata to a local file.
 
-## Prerequisites
+## Quick Start (Agents)
 
-Install dependencies (first time only):
+**Just run it, then react to any error:**
 
 ```bash
-uv run --script bin/airtable-export-schema --help   # installs deps automatically via uv
-# or manually: pip install requests
+airtable-export-schema
 ```
+
+- The command is **already on PATH** when this plugin is installed — don't search the plugin cache for the script or invoke it via `uv run --script` (the shebang handles uv, and uv installs the `requests` dependency automatically on first run). In a standalone checkout, run `bin/airtable-export-schema` from the repo root.
+- Credentials load automatically (see [Credentials](#credentials)) — don't pre-check `.env` or the environment first. If something is missing, the script exits with an error naming the missing variable and how to provide it; react to that error instead.
 
 ## Personal Access Token (PAT)
 
