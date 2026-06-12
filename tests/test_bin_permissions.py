@@ -5,16 +5,23 @@ REPO = Path(__file__).parent.parent
 
 
 def _index_modes() -> dict[str, str]:
-    """Map of tracked path -> git index mode (e.g. '100755')."""
+    """Map of tracked path -> git index mode (e.g. '100755').
+
+    -z gives NUL-separated entries with unquoted paths, so a filename containing
+    quotes or newlines can't dodge the scan (without it git C-quotes such paths
+    and the shebang read below would open a non-existent literal path).
+    """
     out = subprocess.run(
-        ["git", "ls-files", "-s"],
+        ["git", "ls-files", "-s", "-z"],
         capture_output=True,
         text=True,
         check=True,
         cwd=REPO,
     ).stdout
     modes = {}
-    for line in out.splitlines():
+    for line in out.split("\0"):
+        if not line:
+            continue
         meta, path = line.split("\t", 1)
         modes[path] = meta.split(" ", 1)[0]
     return modes
