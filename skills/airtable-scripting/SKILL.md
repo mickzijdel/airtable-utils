@@ -1,6 +1,6 @@
 ---
 name: airtable-scripting
-description: "Comprehensive guidance for writing Airtable scripts in both Scripting Extensions (manual execution) and Automation Scripts (triggered execution). Use when writing scripts for Airtable Scripting Extensions, creating automation scripts, integrating external APIs with Airtable, working with Airtable's native Scripting API, handling different field types programmatically, or troubleshooting script errors."
+description: "Use when writing or debugging an Airtable script, in a Scripting Extension or an Automation: the Scripting API, field types, calling external APIs from Airtable, or script errors."
 ---
 
 # Airtable Scripting Skill
