@@ -24,10 +24,11 @@ import argparse
 import json
 import os
 import shutil
-import requests
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+import requests
 
 
 def _load_dotenv(env_path: Path) -> None:

@@ -3,7 +3,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 sys.path.insert(0, str(Path(__file__).parent))
 from conftest import load_bin_script
 

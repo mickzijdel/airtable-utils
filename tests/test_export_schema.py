@@ -25,7 +25,7 @@ def test_build_output_adds_base_identity():
     assert out["base"] == {"id": "appXXX", "name": "My Base"}
     # tables preserved, base listed first
     assert out["tables"] == schema["tables"]
-    assert list(out.keys())[0] == "base"
+    assert next(iter(out.keys())) == "base"
 
 
 def test_build_output_does_not_mutate_input():
@@ -52,7 +52,7 @@ def test_build_output_includes_summary():
     }
     out = build_output(schema, "appXXX", "My Base")
     # base stays first, tables preserved untouched
-    assert list(out.keys())[0] == "base"
+    assert next(iter(out.keys())) == "base"
     assert out["tables"] == schema["tables"]
     # summary present and correct
     assert out["summary"]["tableCount"] == 1

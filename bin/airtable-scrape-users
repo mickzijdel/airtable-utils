@@ -32,9 +32,8 @@ import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from playwright.async_api import async_playwright, Page, BrowserContext
+from playwright.async_api import BrowserContext, Page, async_playwright
 
 
 def _load_dotenv(env_path: Path) -> None:
@@ -117,7 +116,7 @@ class BaseAccessReport:
     workspace_name: str
     users: list[UserInfo] = field(default_factory=list)
     scrape_time: str = field(default_factory=lambda: datetime.now().isoformat())
-    error: Optional[str] = None
+    error: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -176,7 +175,7 @@ class AirtableScraper:
         self.headless = headless
         self.debug = debug
         self.browser = None
-        self.context: Optional[BrowserContext] = None
+        self.context: BrowserContext | None = None
         self.captured_data: dict = {}
         self.context_recycle_interval = context_recycle_interval
         self.max_retries = max_retries
@@ -332,7 +331,7 @@ class AirtableScraper:
 
                 return self._parse_access_data(base_id, self.captured_data)
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - every failure is classified for retry
                 last_error = str(e)
                 is_retryable = self._is_retryable_error(e)
 
@@ -359,7 +358,7 @@ class AirtableScraper:
             error=last_error or "Unknown error",
         )
 
-    async def _extract_from_source(self, page: Page) -> Optional[dict]:
+    async def _extract_from_source(self, page: Page) -> dict | None:
         """
         Fallback: extract init data from page HTML source.
         Looks for window.resolveLiveappDataPromise({...}) in script tags.
@@ -392,7 +391,7 @@ class AirtableScraper:
         # 1. Save page HTML
         content = await page.content()
         html_path = DEBUG_DIR / f"{base_id}.html"
-        with open(html_path, "w", encoding="utf-8") as f:
+        with open(html_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230 - scrapes run one at a time
             f.write(content)
         print(f"  [DEBUG] Saved HTML to {html_path}")
 
@@ -464,7 +463,7 @@ class AirtableScraper:
 
         # 5. Save full debug report
         report_path = DEBUG_DIR / f"{base_id}_report.txt"
-        with open(report_path, "w", encoding="utf-8") as f:
+        with open(report_path, "w", encoding="utf-8") as f:  # noqa: ASYNC230 - scrapes run one at a time
             f.write(f"Debug Report for {base_id}\n")
             f.write("=" * 50 + "\n\n")
             f.write(f"Window globals: {globals_info}\n\n")
@@ -683,7 +682,7 @@ def export_aggregated_csvs(reports: list[BaseAccessReport]):
 
     files_created = []
 
-    for ws_id, ws_reports in by_workspace.items():
+    for ws_reports in by_workspace.values():
         ws_name = ws_reports[0].workspace_name or "Unknown"
 
         # Sanitize filename
@@ -1066,35 +1065,35 @@ def compare_reports(old_file: Path, new_reports: list[BaseAccessReport]) -> dict
         base_name = new_report.base_name
 
         # Added users
-        for email in new_users:
+        for email, user in new_users.items():
             if email not in old_users:
                 changes["added_users"].append(
                     {
                         "base_id": base_id,
                         "base_name": base_name,
                         "email": email,
-                        "name": new_users[email].full_name,
-                        "permission": new_users[email].permission_level,
+                        "name": user.full_name,
+                        "permission": user.permission_level,
                     }
                 )
 
         # Removed users
-        for email in old_users:
+        for email, old_user in old_users.items():
             if email not in new_users:
                 changes["removed_users"].append(
                     {
                         "base_id": base_id,
                         "base_name": base_name,
                         "email": email,
-                        "name": old_users[email].get("name", ""),
+                        "name": old_user.get("name", ""),
                     }
                 )
 
         # Permission changes
-        for email in new_users:
+        for email, user in new_users.items():
             if email in old_users:
                 old_perm = old_users[email].get("permission_level", "")
-                new_perm = new_users[email].permission_level
+                new_perm = user.permission_level
                 if old_perm != new_perm:
                     changes["permission_changes"].append(
                         {
@@ -1153,7 +1152,7 @@ def print_changes(changes: dict) -> None:
     if total == 0:
         print("\n✓ No changes detected")
 
-    print("")
+    print()
 
 
 async def main():
@@ -1345,7 +1344,7 @@ async def main():
             "bases": [r.to_dict() for r in reports],
         }
 
-        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:  # noqa: ASYNC230 - scrapes run one at a time
             json.dump(output, f, indent=2)
 
         print(f"\nResults saved to {OUTPUT_FILE}")

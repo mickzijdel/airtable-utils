@@ -22,7 +22,6 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
@@ -88,9 +87,9 @@ def diff_schemas(old: dict, new: dict) -> SchemaDiff:
     removed = [old_tables[i] for i in old_tables if i not in new_tables]
     changed = []
 
-    for tid in old_tables:
+    for tid, old_table in old_tables.items():
         if tid in new_tables:
-            td = _diff_table(old_tables[tid], new_tables[tid])
+            td = _diff_table(old_table, new_tables[tid])
             if td.has_changes():
                 changed.append(td)
 
@@ -109,10 +108,10 @@ def _diff_table(old: dict, new: dict) -> TableDiff:
     td.added_fields = [new_fields[i] for i in new_fields if i not in old_fields]
     td.removed_fields = [old_fields[i] for i in old_fields if i not in new_fields]
 
-    for fid in old_fields:
+    for fid, of in old_fields.items():
         if fid not in new_fields:
             continue
-        of, nf = old_fields[fid], new_fields[fid]
+        nf = new_fields[fid]
         if of["name"] != nf["name"]:
             td.renamed_fields.append((fid, of["name"], nf["name"]))
         if of["type"] != nf["type"]:
